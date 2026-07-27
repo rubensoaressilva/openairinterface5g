@@ -1055,6 +1055,8 @@ static void NRRCconfig_RU(configmodule_interface_t *cfg)
       } else if (strcmp(str, "interdigital") == 0) {
         ru->openair0_cfg.gpio_controller = RU_GPIO_CONTROL_INTERDIGITAL;
         LOG_I(PHY, "RU GPIO control set as 'interdigital'\n");
+      } else if (strcmp(str, "none") == 0) {
+        ru->openair0_cfg.gpio_controller = RU_GPIO_CONTROL_NONE;
       } else {
         AssertFatal(false, "bad GPIO controller in configuration file: '%s'\n", str);
       }
