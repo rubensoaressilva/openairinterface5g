@@ -57,7 +57,12 @@ void *nrmac_stats_thread(void *arg) {
   while (oai_exit == 0) {
     char *p = output;
     NR_SCHED_LOCK(&gNB->sched_lock);
-    p += dump_mac_stats(gNB, &gNB->cells[0], p, end - p, false);
+    for (int i = 0; i < NR_MAX_CELLS; i++) {
+      nr_cell_sched_t *cell = &gNB->cells[i];
+      if (cell->common_channels.ServingCellConfigCommon == NULL)
+        continue;
+      p += dump_mac_stats(gNB, cell, p, end - p, false);
+    }
     p += snprintf(p, end - p, "\n");
     p += print_meas_log(&gNB->gNB_scheduler, "gNB_scheduler", NULL, NULL, p, end - p);
     p += print_meas_log(&gNB->rx_ulsch_sdu, "rx_ulsch_sdu", NULL, NULL, p, end - p);
