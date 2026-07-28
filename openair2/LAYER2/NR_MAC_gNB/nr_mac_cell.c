@@ -30,3 +30,13 @@ nr_cell_sched_t *nr_mac_get_cell_by_cgi(gNB_MAC_INST *mac, plmn_id_t plmn, uint6
   }
   return NULL;
 }
+
+nr_cell_sched_t *nr_mac_get_first_active_cell(gNB_MAC_INST *mac)
+{
+  for (int i = 0; i < NR_MAX_CELLS; i++) {
+    nr_cell_sched_t *cell = &mac->cells[i];
+    if (cell->common_channels.ServingCellConfigCommon != NULL)
+      return cell;
+  }
+  return NULL;
+}

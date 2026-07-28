@@ -45,6 +45,7 @@ bool nr_mac_add_test_ue(gNB_MAC_INST *nrmac, nr_cell_sched_t *cell, uint32_t rnt
 void nr_mac_prepare_ra_ue(gNB_MAC_INST *nrmac, nr_cell_sched_t *cell, NR_UE_info_t *UE);
 nr_cell_sched_t *nr_mac_get_cell_by_pci(gNB_MAC_INST *mac, uint16_t pci);
 nr_cell_sched_t *nr_mac_get_cell_by_cgi(gNB_MAC_INST *mac, plmn_id_t plmn, uint64_t nr_cellid);
+nr_cell_sched_t *nr_mac_get_first_active_cell(gNB_MAC_INST *mac);
 bool add_new_UE_RA(gNB_MAC_INST *nr_mac, NR_UE_info_t *UE);
 int nr_mac_get_reconfig_delay_slots(NR_SubcarrierSpacing_t scs);
 
@@ -97,7 +98,7 @@ int check_sc_fdma_rbsize(long transform_precoding, uint16_t rb);
 
 void nr_mac_pcch_queue_init(NR_COMMON_channels_t *cc);
 void nr_mac_pcch_queue_free(NR_COMMON_channels_t *cc);
-void nr_mac_pcch_enqueue(module_id_t module_id, uint64_t fiveg_s_tmsi, uint16_t ue_id);
+void nr_mac_pcch_enqueue(gNB_MAC_INST *mac, nr_cell_sched_t *cell, uint64_t fiveg_s_tmsi, uint16_t ue_id);
 void schedule_nr_pcch(gNB_MAC_INST *gNB_mac,
                       nr_cell_sched_t *cell,
                       frame_t frameP,
