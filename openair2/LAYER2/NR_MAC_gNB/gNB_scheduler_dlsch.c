@@ -752,7 +752,6 @@ static void nr_dl_schedule(gNB_MAC_INST *mac,
   nr_dl_sched_params_t params = {
       .mac = mac,
       .cell = cell,
-      .CC_id = 0,//TODO: add CC_id to the cell structure in the first commit
       .frame = frame,
       .slot = slot,
       .num_beams = num_beams,

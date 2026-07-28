@@ -1967,7 +1967,6 @@ static int nr_ul_schedule(gNB_MAC_INST *nrmac,
   nr_ul_sched_params_t params = {
       .mac = nrmac,
       .cell = cell,
-      .CC_id = 0,
       .dci_frame = frame,
       .dci_slot = slot,
       .frame = sched_frame,
@@ -2417,6 +2416,7 @@ static int collect_ul_candidates(gNB_MAC_INST *mac,
       break;
 
     NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
+    /// TODO: in a follow up commit if UE in cell
     if (!nr_mac_ue_is_active(UE))
       continue;
 

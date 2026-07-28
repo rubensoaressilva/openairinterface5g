@@ -905,7 +905,6 @@ typedef struct nr_dl_sched_params nr_dl_sched_params_t;
 struct nr_dl_sched_params {
   struct gNB_MAC_INST_s *mac; ///< MAC instance (for CCE/PUCCH validation)
   struct nr_cell_sched_s *cell;
-  int CC_id;
   frame_t frame;
   slot_t slot;
   int num_beams; ///< number of beams
@@ -1022,7 +1021,6 @@ typedef struct nr_ul_candidate nr_ul_candidate_t;
 typedef struct nr_ul_sched_params {
   struct gNB_MAC_INST_s *mac;
   struct nr_cell_sched_s *cell;
-  int CC_id;
   frame_t dci_frame; ///< DCI slot frame (current DL slot)
   slot_t dci_slot; ///< DCI slot (current DL slot)
   frame_t frame; ///< scheduled PUSCH frame (future UL slot)
