@@ -129,12 +129,10 @@ static void nr_fill_pusch_fapi_groups(nfapi_nr_ul_tti_request_t *UL_tti_req)
   }
 }
 
-void gNB_dlsch_ulsch_scheduler(module_id_t module_idP, nr_cell_sched_t *cell, frame_t frame, slot_t slot, NR_Sched_Rsp_t *sched_info)
+void gNB_dlsch_ulsch_scheduler(gNB_MAC_INST *gNB, nr_cell_sched_t *cell, frame_t frame, slot_t slot, NR_Sched_Rsp_t *sched_info)
 {
   protocol_ctxt_t ctxt = {0};
-  PROTOCOL_CTXT_SET_BY_MODULE_ID(&ctxt, module_idP, ENB_FLAG_YES, NOT_A_RNTI, frame, slot,module_idP);
-
-  gNB_MAC_INST *gNB = RC.nrmac[module_idP];
+  PROTOCOL_CTXT_SET_BY_MODULE_ID(&ctxt, gNB->Mod_id, ENB_FLAG_YES, NOT_A_RNTI, frame, slot, gNB->Mod_id);
   NR_COMMON_channels_t *cc = &cell->common_channels;
   NR_ServingCellConfigCommon_t *scc = cc->ServingCellConfigCommon;
 

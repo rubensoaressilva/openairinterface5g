@@ -377,7 +377,7 @@ static void run_scheduler_monolithic(const nfapi_nr_slot_indication_scf_t *ind, 
   reset_sched_response(rsp, ind->sfn, ind->slot, module_id, 0);
   gNB_MAC_INST *mac = RC.nrmac[module_id];
   nr_cell_sched_t *cell = nr_mac_get_cell_by_pci(mac, ind->header.phy_id);
-  gNB_dlsch_ulsch_scheduler(rsp->module_id, cell, ind->sfn, ind->slot, rsp);
+  gNB_dlsch_ulsch_scheduler(mac, cell, ind->sfn, ind->slot, rsp);
 }
 
 static void NR_UL_indication(NR_UL_IND_t *UL_info)
