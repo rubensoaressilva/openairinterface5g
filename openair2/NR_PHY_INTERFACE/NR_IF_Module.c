@@ -49,7 +49,7 @@ static void handle_nr_rach(NR_UL_IND_t *UL_info)
         LOG_E(MAC, "Not more than 1 preamble per RACH PDU supported, ignoring the rest\n");
       }
       gNB_MAC_INST *nr_mac = RC.nrmac[UL_info->module_id];
-      nr_cell_sched_t* cell = &nr_mac->cells[UL_info->CC_id];
+      nr_cell_sched_t *cell = nr_mac_get_cell_by_pci(nr_mac, UL_info->nr_pci);
       nr_initiate_ra_proc(nr_mac,
                           cell,
                           UL_info->rach_ind.sfn,
@@ -76,7 +76,7 @@ static void handle_nr_uci(NR_UL_IND_t *UL_info)
 
   const module_id_t mod_id = UL_info->module_id;
   gNB_MAC_INST *nrmac = RC.nrmac[mod_id];
-  nr_cell_sched_t *cell = &nrmac->cells[UL_info->CC_id];
+  nr_cell_sched_t *cell = nr_mac_get_cell_by_pci(nrmac, UL_info->nr_pci);
   const frame_t frame = UL_info->uci_ind.sfn;
   const slot_t slot = UL_info->uci_ind.slot;
   int num_ucis = UL_info->uci_ind.num_ucis;
@@ -173,7 +173,7 @@ static void handle_nr_ulsch(NR_UL_IND_t *UL_info)
 
       /* if CRC passes, pass PDU, otherwise pass NULL as error indication */
       gNB_MAC_INST *gNB_mac = RC.nrmac[UL_info->module_id];
-      nr_cell_sched_t *cell = &gNB_mac->cells[UL_info->CC_id];
+      nr_cell_sched_t *cell = nr_mac_get_cell_by_pci(gNB_mac, UL_info->nr_pci);
       nr_rx_sdu(gNB_mac,
                 cell,
                 UL_info->rx_ind.sfn,
@@ -209,8 +209,7 @@ static void handle_nr_srs(NR_UL_IND_t *UL_info)
   const int num_srs = UL_info->srs_ind.number_of_pdus;
   nfapi_nr_srs_indication_pdu_t *srs_list = UL_info->srs_ind.pdu_list;
   gNB_MAC_INST *nrmac = RC.nrmac[module_id];
-  nr_cell_sched_t *cell = &nrmac->cells[UL_info->CC_id];
-  // from here
+  nr_cell_sched_t *cell = nr_mac_get_cell_by_pci(nrmac, UL_info->nr_pci);
 
   for (int i = 0; i < num_srs; i++) {
     nfapi_nr_srs_indication_pdu_t *srs_ind = &srs_list[i];
@@ -375,21 +374,22 @@ static void pnf_send_slot_ind(const nfapi_nr_slot_indication_scf_t *ind, NR_Sche
 static void run_scheduler_monolithic(const nfapi_nr_slot_indication_scf_t *ind, NR_Sched_Rsp_t *rsp)
 {
   module_id_t module_id = 0;
-  int CC_id = 0;
-  reset_sched_response(rsp, ind->sfn, ind->slot, module_id, CC_id);
-  nr_cell_sched_t *cell = &RC.nrmac[rsp->module_id]->cells[CC_id];
-  gNB_dlsch_ulsch_scheduler(rsp->module_id,cell, ind->sfn, ind->slot, rsp);
+  reset_sched_response(rsp, ind->sfn, ind->slot, module_id, 0);
+  gNB_MAC_INST *mac = RC.nrmac[module_id];
+  nr_cell_sched_t *cell = nr_mac_get_cell_by_pci(mac, ind->header.phy_id);
+  gNB_dlsch_ulsch_scheduler(rsp->module_id, cell, ind->sfn, ind->slot, rsp);
 }
 
 static void NR_UL_indication(NR_UL_IND_t *UL_info)
 {
   AssertFatal(UL_info!=NULL,"UL_info is null\n");
   module_id_t module_id = UL_info->module_id;
-  int CC_id = UL_info->CC_id;
 
-  LOG_D(NR_PHY,"SFN/SLOT:%d.%d module_id:%d CC_id:%d UL_info[rach_pdus:%zu rx_ind:%zu crcs:%zu]\n",
-        UL_info->frame, UL_info->slot,
-        module_id, CC_id,
+  LOG_D(NR_PHY, "SFN/SLOT:%d.%d module_id:%d nr_pci:%d UL_info[rach_pdus:%zu rx_ind:%zu crcs:%zu]\n",
+        UL_info->frame,
+        UL_info->slot,
+        module_id,
+        UL_info->nr_pci,
         gnb_rach_ind_queue.num_items,
         gnb_rx_ind_queue.num_items,
         gnb_crc_ind_queue.num_items);

@@ -29,8 +29,8 @@
 typedef struct {
   /// Module ID
   module_id_t module_id;
-  /// CC ID
-  int CC_id;
+  /// Physical Cell ID (matches FAPI header->phy_id)
+  uint16_t nr_pci;
   /// frame
   frame_t frame;
   /// slot
