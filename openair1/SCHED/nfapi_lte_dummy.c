@@ -65,3 +65,9 @@ void socket_nfapi_nr_pnf_stop()
 void socket_nfapi_send_stop_request(vnf_t *vnf)
 {
 }
+typedef struct gNB_MAC_INST_s gNB_MAC_INST;
+typedef struct nr_cell_sched_s nr_cell_sched_t;
+nr_cell_sched_t *nr_mac_get_cell_by_pci(gNB_MAC_INST *mac, uint16_t pci)
+{
+  return NULL;
+}

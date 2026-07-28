@@ -958,7 +958,7 @@ int phy_nr_slot_indication(nfapi_nr_slot_indication_scf_t *ind)
    * messages from queue into which messages have been copied.
    * TODO we should have different callbacks for received messages and call
    * into the scheduler separately for each message instead of one big one. */
-  NR_UL_IND_t ul_ind = {.frame = ind->sfn, .slot = ind->slot, };
+  NR_UL_IND_t ul_ind = {.frame = ind->sfn, .slot = ind->slot, .nr_pci = ind->header.phy_id };
   ifi->NR_UL_indication(&ul_ind);
 
   return 1;
@@ -967,7 +967,7 @@ int phy_nr_slot_indication(nfapi_nr_slot_indication_scf_t *ind)
 int phy_nr_srs_indication(nfapi_nr_srs_indication_t *ind)
 {
   gNB_MAC_INST *nrmac = RC.nrmac[0];
-  nr_cell_sched_t *cell = &nrmac->cells[ind->header.phy_id];
+  nr_cell_sched_t *cell = nr_mac_get_cell_by_pci(nrmac, ind->header.phy_id);
 
   for (int i = 0; i < ind->number_of_pdus; ++i)
     handle_nr_srs_measurements(nrmac, cell, ind->sfn, ind->slot, &ind->pdu_list[i]);
@@ -1413,7 +1413,7 @@ int nr_param_resp_cb(nfapi_vnf_config_t *config, int p5_idx, nfapi_nr_param_resp
   vnf_p7_info *p7_vnf = vnf->p7_vnfs;
   pnf_info *pnf = vnf->pnfs;
   phy_info *phy = pnf->phys;
-  nfapi_nr_config_request_scf_t *req = &RC.nrmac[0]->cells[resp->header.phy_id].config; // check
+  nfapi_nr_config_request_scf_t *req = &nr_mac_get_cell_by_pci(RC.nrmac[0], resp->header.phy_id)->config;
 #ifndef ENABLE_AERIAL
   struct sockaddr_in pnf_p7_sockaddr;
   phy->remote_port = resp->nfapi_config.p7_pnf_port.value;
