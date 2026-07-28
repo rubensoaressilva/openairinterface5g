@@ -966,7 +966,7 @@ void nr_mac_config_scc(gNB_MAC_INST *nrmac, nr_cell_sched_t *cell, NR_ServingCel
 
   if (NFAPI_MODE == NFAPI_MONOLITHIC) {
     // nothing to be sent in the other cases
-    NR_PHY_Config_t phycfg = {.Mod_id = nrmac->Mod_id, .CC_id = 0 /*Maybe it makes sense to add CC_ID to the cell structure, since it seems to be hardcoded to 0*/, .cfg = &cell->config};
+    NR_PHY_Config_t phycfg = {.Mod_id = nrmac->Mod_id, .cfg = &cell->config};
     DevAssert(nrmac->if_inst->NR_PHY_config_req);
     nrmac->if_inst->NR_PHY_config_req(&phycfg);
   }

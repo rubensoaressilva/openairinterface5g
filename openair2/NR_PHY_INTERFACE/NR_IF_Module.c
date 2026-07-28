@@ -365,17 +365,14 @@ static void match_crc_rx_pdu(nfapi_nr_rx_data_indication_t *rx_ind, nfapi_nr_crc
 
 static void pnf_send_slot_ind(const nfapi_nr_slot_indication_scf_t *ind, NR_Sched_Rsp_t *rsp)
 {
-  module_id_t module_id = 0;
-  int CC_id = 0;
-  reset_sched_response(rsp, ind->sfn, ind->slot, module_id, CC_id);
+  reset_sched_response(rsp, ind->sfn, ind->slot, 0);
   handle_nr_slot_ind(ind->sfn, ind->slot, rsp);
 }
 
 static void run_scheduler_monolithic(const nfapi_nr_slot_indication_scf_t *ind, NR_Sched_Rsp_t *rsp)
 {
-  module_id_t module_id = 0;
-  reset_sched_response(rsp, ind->sfn, ind->slot, module_id, 0);
-  gNB_MAC_INST *mac = RC.nrmac[module_id];
+  reset_sched_response(rsp, ind->sfn, ind->slot, 0);
+  gNB_MAC_INST *mac = RC.nrmac[0];
   nr_cell_sched_t *cell = nr_mac_get_cell_by_pci(mac, ind->header.phy_id);
   gNB_dlsch_ulsch_scheduler(mac, cell, ind->sfn, ind->slot, rsp);
 }
@@ -474,10 +471,9 @@ NR_IF_Module_t *NR_IF_Module_init(int Mod_id) {
   return nr_if_inst[Mod_id];
 }
 
-void reset_sched_response(NR_Sched_Rsp_t *sched_response, int frame, int slot, int module_id, int CC_id)
+void reset_sched_response(NR_Sched_Rsp_t *sched_response, int frame, int slot, int module_id)
 {
   sched_response->module_id = module_id;
-  sched_response->CC_id = CC_id;
   sched_response->frame = frame;
   sched_response->slot = slot;
 
