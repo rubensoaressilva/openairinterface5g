@@ -790,12 +790,6 @@ void ue_context_setup_request(const f1ap_ue_context_setup_req_t *req)
 void ue_context_modification_request(const f1ap_ue_context_mod_req_t *req)
 {
   gNB_MAC_INST *mac = RC.nrmac[0];
-  // SpCell CGI is optional in UE Context Modification (only present on handover).
-  // TODO: store cell pointer on NR_UE_info_t and derive from there.
-  nr_cell_sched_t *cell = (req->plmn && req->nr_cellid)
-                              ? nr_mac_get_cell_by_cgi(mac, *req->plmn, *req->nr_cellid)
-                              : nr_mac_get_first_active_cell(mac);
-  AssertFatal(cell != NULL, "no active cell found for UE context modification\n");
   f1ap_ue_context_mod_resp_t resp = {
     .gNB_CU_ue_id = req->gNB_CU_ue_id,
     .gNB_DU_ue_id = req->gNB_DU_ue_id,
@@ -811,12 +805,19 @@ void ue_context_modification_request(const f1ap_ue_context_mod_req_t *req)
   }
 
   NR_SCHED_LOCK(&mac->sched_lock);
-  NR_UE_info_t *UE = find_nr_UE(&RC.nrmac[0]->UE_info, req->gNB_DU_ue_id);
+  NR_UE_info_t *UE = find_nr_UE(&mac->UE_info, req->gNB_DU_ue_id);
   if (!UE) {
     LOG_E(NR_MAC, "could not find UE with RNTI %04x\n", req->gNB_DU_ue_id);
     NR_SCHED_UNLOCK(&mac->sched_lock);
     return;
   }
+
+  // SpCell CGI is optional in UE Context Modification (only present on handover).
+  // When not provided, derive the cell from the UE's serving cell.
+  nr_cell_sched_t *cell = (req->plmn && req->nr_cellid)
+                              ? nr_mac_get_cell_by_cgi(mac, *req->plmn, *req->nr_cellid)
+                              : UE->cell;
+  AssertFatal(cell != NULL, "no cell found for UE context modification\n");
 
   NR_CellGroupConfig_t *new_CellGroup = get_cellgroup_config(UE);
 
