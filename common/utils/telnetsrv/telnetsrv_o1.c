@@ -73,7 +73,9 @@ static int get_stats(char *buf, int debug, telnet_printfunc_t prnt)
   const f1ap_setup_req_t *sr = mac->f1_config.setup_req;
   const f1ap_served_cell_info_t *cell_info = &sr->cell[0].info;
 
-  const NR_ServingCellConfigCommon_t *scc = mac->cells[0].common_channels.ServingCellConfigCommon;
+  nr_cell_sched_t *cell = nr_mac_get_cell_by_cgi(mac, cell_info->plmn, cell_info->nr_cellid);
+  AssertFatal(cell != NULL, "cell with CGI (cellid=%lu) not found\n", cell_info->nr_cellid);
+  const NR_ServingCellConfigCommon_t *scc = cell->common_channels.ServingCellConfigCommon;
   const NR_FrequencyInfoDL_t *frequencyInfoDL = scc->downlinkConfigCommon->frequencyInfoDL;
   const NR_FrequencyInfoUL_t *frequencyInfoUL = scc->uplinkConfigCommon->frequencyInfoUL;
   frame_type_t frame_type = get_frame_type(*frequencyInfoDL->frequencyBandList.list.array[0], *scc->ssbSubcarrierSpacing);
@@ -286,7 +288,9 @@ static int set_bwconfig(char *buf, int debug, telnet_printfunc_t prnt)
     *end = 0;
 
   gNB_MAC_INST *mac = RC.nrmac[0];
-  NR_ServingCellConfigCommon_t *scc = mac->cells[0].common_channels.ServingCellConfigCommon;
+  nr_cell_sched_t *active_cell = nr_mac_get_first_active_cell(mac);
+  AssertFatal(active_cell != NULL, "no active cell\n");
+  NR_ServingCellConfigCommon_t *scc = active_cell->common_channels.ServingCellConfigCommon;
   NR_FrequencyInfoDL_t *frequencyInfoDL = scc->downlinkConfigCommon->frequencyInfoDL;
   NR_BWP_t *initialDL = &scc->downlinkConfigCommon->initialDownlinkBWP->genericParameters;
   NR_FrequencyInfoUL_t *frequencyInfoUL = scc->uplinkConfigCommon->frequencyInfoUL;
@@ -331,14 +335,15 @@ static int set_bwconfig(char *buf, int debug, telnet_printfunc_t prnt)
     ERROR_MSG_RET("unhandled option %s\n", buf);
   }
 
-  nr_cell_sched_t *cell = &RC.nrmac[0]->cells[0];
+  const f1ap_served_cell_info_t *info = &mac->f1_config.setup_req->cell[0].info;
+  nr_cell_sched_t *cell = nr_mac_get_cell_by_cgi(mac, info->plmn, info->nr_cellid);
+  AssertFatal(cell != NULL, "cell with CGI (cellid=%lu) not found\n", info->nr_cellid);
   free(cell->sched_ctrlSIB1);
   cell->sched_ctrlSIB1 = NULL;
 
   free_MIB_NR(cell->common_channels.mib);
   cell->common_channels.mib = get_new_MIB_NR(scc);
 
-  const f1ap_served_cell_info_t *info = &mac->f1_config.setup_req->cell[0].info;
   nr_mac_configure_sib1(cell, &info->plmn, info->nr_cellid, *info->tac);
 
   prnt("OK\n");
