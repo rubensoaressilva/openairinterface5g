@@ -46,11 +46,12 @@ bool read_mac_sm(void* data)
     rd->dl_aggr_tbs = UE->mac_stats.dl.total_bytes;
     rd->ul_aggr_tbs = UE->mac_stats.ul.total_bytes;
 
-    if (is_dl_slot(rd->slot, &RC.nrmac[mod_id]->cells[0].frame_structure)) {
+    nr_cell_sched_t *cell = UE->cell;
+    if (cell && is_dl_slot(rd->slot, &cell->frame_structure)) {
       rd->dl_curr_tbs = UE->mac_stats.dl.current_bytes;
       rd->dl_sched_rb = UE->mac_stats.dl.current_rbs;
     }
-    if (is_ul_slot(rd->slot, &RC.nrmac[mod_id]->cells[0].frame_structure)) {
+    if (cell && is_ul_slot(rd->slot, &cell->frame_structure)) {
       rd->ul_curr_tbs = UE->mac_stats.ul.current_bytes;
       rd->ul_sched_rb = UE->mac_stats.ul.current_rbs;
     }

@@ -90,6 +90,7 @@ static meas_record_lst_t fill_DRB_PdcpSduVolumeUL(__attribute__((unused)) const 
   return meas_record;
 }
 
+#if defined(NGRAN_GNB_DU)
 /* L1M.SS-RSRP — 3GPP TS 28.552 - section 5.1.1.22.1 */
 static meas_record_lst_t fill_L1M_SS_RSRP(const label_info_lst_t label,
                                           __attribute__((unused)) uint32_t gran_period_ms,
@@ -113,7 +114,9 @@ static meas_record_lst_t fill_L1M_SS_RSRP(const label_info_lst_t label,
   }
   const uint32_t bin = *label.distBinX;
 
-  const NR_du_stats_t *du_stats = &RC.nrmac[0]->du_stats;
+  const nr_cell_sched_t *cell = nr_mac_get_first_active_cell(RC.nrmac[0]);
+  AssertFatal(cell != NULL, "no active cell\n");
+  const NR_du_stats_t *du_stats = &cell->du_stats;
 
   uint64_t count = 0;
   if (label.ssbIndex != NULL) {
@@ -134,6 +137,7 @@ static meas_record_lst_t fill_L1M_SS_RSRP(const label_info_lst_t label,
   meas_record.int_val = (int64_t)count;
   return meas_record;
 }
+#endif /* NGRAN_GNB_DU */
 
 /* MR.NRScSSSINR — 3GPP TS 28.552 - section 5.1.1.32 */
 static meas_record_lst_t fill_MR_NRScSSSINR(const label_info_lst_t label,
@@ -346,7 +350,9 @@ static meas_record_lst_t fill_CARR_PDSCHMCSDist(const label_info_lst_t label,
     return meas_record;
   }
 
-  const NR_du_stats_t* du_stats = &RC.nrmac[0]->cells[0].du_stats;
+  nr_cell_sched_t *cell = nr_mac_get_first_active_cell(RC.nrmac[0]);
+  AssertFatal(cell != NULL, "no active cell\n");
+  const NR_du_stats_t *du_stats = &cell->du_stats;
   meas_record.value = INTEGER_MEAS_VALUE;
   meas_record.int_val = du_stats->pdsch_mcs_dist[bin_x - 1][bin_y - 1][bin_z];
   return meas_record;
@@ -379,7 +385,9 @@ static meas_record_lst_t fill_CARR_PUSCHMCSDist(const label_info_lst_t label,
     return meas_record;
   }
 
-  const NR_du_stats_t* du_stats = &RC.nrmac[0]->du_stats;
+  const nr_cell_sched_t *cell = nr_mac_get_first_active_cell(RC.nrmac[0]);
+  AssertFatal(cell != NULL, "no active cell\n");
+  const NR_du_stats_t *du_stats = &cell->du_stats;
   meas_record.value = INTEGER_MEAS_VALUE;
   meas_record.int_val = du_stats->pusch_mcs_dist[bin_x - 1][bin_y][bin_z];
   return meas_record;
@@ -389,7 +397,9 @@ static meas_record_lst_t fill_CARR_PUSCHMCSDist(const label_info_lst_t label,
 static kv_measure_t lst_measure[] = {
   {.key = "DRB.PdcpSduVolumeDL", .value = fill_DRB_PdcpSduVolumeDL },
   {.key = "DRB.PdcpSduVolumeUL", .value = fill_DRB_PdcpSduVolumeUL },
+#if defined(NGRAN_GNB_DU)
   {.key = "L1M.SS-RSRP",         .value = fill_L1M_SS_RSRP },
+#endif
   {.key = "MR.NRScSSSINR",       .value = fill_MR_NRScSSSINR },
   {.key = "RRC.ConnMean",        .value = fill_RRC_ConnMean },
 #if defined (NGRAN_GNB_DU)
