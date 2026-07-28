@@ -857,11 +857,10 @@ static void nr_generate_Msg3_retransmission(nr_cell_sched_t *cell,
 
   sched_pusch.rbStart = rbStart;
   LOG_I(NR_MAC,
-        "%4d%2d: RA RNTI %04x CC_id %d Scheduling retransmission of Msg3 in (%d,%d)\n",
+        "%4d%2d: RA RNTI %04x Scheduling retransmission of Msg3 in (%d,%d)\n",
         frame,
         slot,
         UE->rnti,
-        0 /*TODO: get CC_ID*/,
         sched_frame,
         sched_slot);
 

@@ -941,10 +941,9 @@ static void _nr_rx_sdu(gNB_MAC_INST *gNB_mac,
         T_BUFFER(sduP, sdu_lenP));
 
     UE->mac_stats.ul.total_bytes += sdu_lenP;
-    LOG_D(NR_MAC, "[gNB %d][PUSCH %d] CC_id %d %d.%d Received ULSCH sdu from PHY (rnti %04x) ul_cqi %d TA %d sduP %p, rssi %d\n",
+    LOG_D(NR_MAC, "[gNB %d][PUSCH %d] %d.%d Received ULSCH sdu from PHY (rnti %04x) ul_cqi %d TA %d sduP %p, rssi %d\n",
           gNB_mac->Mod_id,
           harq_pid,
-          0 /*CC_idP*/,
           frameP,
           slotP,
           current_rnti,
