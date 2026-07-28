@@ -202,8 +202,6 @@ static void schedule_nr_MsgA_pusch(NR_UplinkConfigCommon_t *uplinkConfigCommon,
                                    uint16_t dmrs_TypeA_Position,
                                    NR_PhysCellId_t physCellId)
 {
-  // TODO: Ask Robert if it makes sense to keep gNB just for this ENSURE_LOCKED
-  NR_SCHED_ENSURE_LOCKED(&nr_mac->sched_lock);
 
   NR_MsgA_PUSCH_Resource_r16_t *msgA_PUSCH_Resource = uplinkConfigCommon->initialUplinkBWP->ext1->msgA_ConfigCommon_r16->choice
                                                           .setup->msgA_PUSCH_Config_r16->msgA_PUSCH_ResourceGroupA_r16;
@@ -701,6 +699,7 @@ void nr_initiate_ra_proc(gNB_MAC_INST *nr_mac,
     }
 
     UE = get_new_nr_ue_inst(&nr_mac->UE_info.uid_allocator, rnti, NULL, &cell->radio_config);
+    UE->cell = cell;
     if (!add_new_UE_RA(nr_mac, UE)) {
       LOG_E(NR_MAC, "FAILURE: %4d.%2d initiating RA procedure for preamble index %d: no free RA process\n", frame, slot, preamble_index);
       delete_nr_ue_data(UE, &nr_mac->UE_info.uid_allocator);

@@ -842,6 +842,7 @@ typedef struct NR_UE_info {
   // dedicated BWP is always 1 from the UE's point of view, even if the gNB has multiple BWPs.
   // The below ID is the "true" (non-consecutive) BWP ID from the gNB's point of view
   NR_BWP_Id_t local_bwp_id;
+  struct nr_cell_sched_s *cell; ///< serving cell for this UE; used to filter candidates per cell
 } NR_UE_info_t;
 
 typedef struct {

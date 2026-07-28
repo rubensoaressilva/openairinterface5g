@@ -457,6 +457,8 @@ static int collect_dl_candidates(nr_cell_sched_t *cell,
 
     if (!nr_mac_ue_is_active(UE))
       continue;
+    if (UE->cell != cell)
+      continue;
 
     NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
     NR_UE_DL_BWP_t *current_BWP = &UE->current_DL_BWP;

@@ -3232,6 +3232,7 @@ bool add_connected_nr_ue(gNB_MAC_INST *nr_mac, nr_cell_sched_t *cell, NR_UE_info
     delete_nr_ue_data(UE, &UE_info->uid_allocator);
     return false;
   }
+  UE->cell = cell;
 
   NR_UE_sched_ctrl_t *sched_ctrl = &UE->UE_sched_ctrl;
   sched_ctrl->dl_max_mcs = 28; /* do not limit MCS for individual UEs */
