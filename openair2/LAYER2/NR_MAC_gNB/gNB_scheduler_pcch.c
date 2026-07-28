@@ -30,20 +30,20 @@ void nr_mac_pcch_queue_init(NR_COMMON_channels_t *cc)
   AssertFatal(ok, "failed to allocate PCCH queue\n");
 }
 
-static void nr_mac_pcch_queue_push(spsc_q_t *q, module_id_t module_id, const nr_mac_pcch_record_t *item)
+static void nr_mac_pcch_queue_push(spsc_q_t *q, const nr_mac_pcch_record_t *item)
 {
   DevAssert(q);
   DevAssert(item);
 
   if (!spsc_q_put(q, item, sizeof(*item)))
-    LOG_W(NR_MAC, "[gNB %d] PCCH queue full, dropping paging record\n", module_id);
+    LOG_W(NR_MAC, "PCCH queue full, dropping paging record\n");
 }
 
 /** Re-queue records after a failed PO transmission attempt */
-static void nr_mac_pcch_queue_reenqueue(spsc_q_t *q, module_id_t module_id, const nr_mac_pcch_record_t *items, int count)
+static void nr_mac_pcch_queue_reenqueue(spsc_q_t *q, const nr_mac_pcch_record_t *items, int count)
 {
   for (int i = 0; i < count; i++)
-    nr_mac_pcch_queue_push(q, module_id, &items[i]);
+    nr_mac_pcch_queue_push(q, &items[i]);
 }
 
 /** @brief Enqueue a pending CN paging record for transmission at the UE's PO.
@@ -58,7 +58,7 @@ void nr_mac_pcch_enqueue(gNB_MAC_INST *mac, nr_cell_sched_t *cell, uint64_t five
   DevAssert(mac);
 
   if (!cell) {
-    LOG_W(NR_MAC, "[gNB %d] paging: no cell with cellid=%lu, dropping\n", mac->Mod_id, cell->nr_cellid);
+    LOG_W(NR_MAC, "paging: no cell with cellid=%lu, dropping\n", cell->nr_cellid);
     return;
   }
   NR_COMMON_channels_t *cc = &cell->common_channels;
@@ -69,10 +69,10 @@ void nr_mac_pcch_enqueue(gNB_MAC_INST *mac, nr_cell_sched_t *cell, uint64_t five
   };
 
   NR_SCHED_LOCK(&mac->sched_lock);
-  nr_mac_pcch_queue_push(&cc->pcch_queue, mac->Mod_id, &item);
+  nr_mac_pcch_queue_push(&cc->pcch_queue, &item);
   NR_SCHED_UNLOCK(&mac->sched_lock);
 
-  LOG_I(NR_MAC, "[gNB %d] PCCH record enqueued UE_ID=%u (5G-S-TMSI=0x%012lx)\n", mac->Mod_id, item.ue_id, fiveg_s_tmsi);
+  LOG_I(NR_MAC, "PCCH record enqueued UE_ID=%u (5G-S-TMSI=0x%012lx)\n", item.ue_id, fiveg_s_tmsi);
 }
 
 /** @brief Get paging search space (Type2-PDCCH CSS) from common search space list by pagingSearchSpace ID.
@@ -495,7 +495,7 @@ void schedule_nr_pcch(gNB_MAC_INST *mac,
           pcch_ue_id,
           batch_count);
     /* PCCH-Message encode failed at this PO: re-queue for next matching PO. */
-    nr_mac_pcch_queue_reenqueue(&cc->pcch_queue, mac->Mod_id, pcch_batch, batch_count);
+    nr_mac_pcch_queue_reenqueue(&cc->pcch_queue, pcch_batch, batch_count);
     return;
   }
 
@@ -548,7 +548,7 @@ void schedule_nr_pcch(gNB_MAC_INST *mac,
           pcch_ue_id,
           batch_count);
     /* No PDCCH resources at this PO: retry in a later cycle */
-    nr_mac_pcch_queue_reenqueue(&cc->pcch_queue, mac->Mod_id, pcch_batch, batch_count);
+    nr_mac_pcch_queue_reenqueue(&cc->pcch_queue, pcch_batch, batch_count);
     free_byte_array(pcch_sdu);
     return;
   }
@@ -594,7 +594,7 @@ void schedule_nr_pcch(gNB_MAC_INST *mac,
           pcch_sdu.len,
           batch_count);
     /* No PDSCH resources at this PO: retry in a later cycle */
-    nr_mac_pcch_queue_reenqueue(&cc->pcch_queue, mac->Mod_id, pcch_batch, batch_count);
+    nr_mac_pcch_queue_reenqueue(&cc->pcch_queue, pcch_batch, batch_count);
     free_byte_array(pcch_sdu);
     return;
   }

@@ -70,14 +70,13 @@ static void fill_ssb_vrb_map(NR_COMMON_channels_t *cc,
                              int rbStart,
                              int ssb_subcarrier_offset,
                              uint16_t symStart,
-                             int CC_id,
                              int beam)
 {
   AssertFatal(*cc->ServingCellConfigCommon->ssbSubcarrierSpacing !=
               NR_SubcarrierSpacing_kHz240,
               "240kHZ subcarrier won't work with current VRB map because a single SSB might be across 2 slots\n");
 
-  uint16_t *vrb_map = cc[CC_id].vrb_map[beam];
+  uint16_t *vrb_map = cc->vrb_map[beam];
   const int extra_prb = ssb_subcarrier_offset > 0;
   for (int rb = 0; rb < 20 + extra_prb; rb++)
     vrb_map[rbStart + rb] = SL_to_bitmap(symStart % NR_SYMBOLS_PER_SLOT, 4);
@@ -188,7 +187,7 @@ void schedule_nr_mib(nr_cell_sched_t *cell, frame_t frameP, slot_t slotP, nfapi_
                        offset_pointa,
                        mib_pdu,
                        cell->radio_config.spatial_stream_index[beam.idx]);
-          fill_ssb_vrb_map(cc, prb_offset, ssbSubcarrierOffset, ssb_start_symbol, 0, beam.idx);
+          fill_ssb_vrb_map(cc, prb_offset, ssbSubcarrierOffset, ssb_start_symbol, beam.idx);
           if (IS_SA_MODE(get_softmodem_params())) {
             get_type0_PDCCH_CSS_config_parameters(&cell->type0_PDCCH_CSS_config[i_ssb],
                                                   frameP,
