@@ -1492,10 +1492,9 @@ static void config_spatial_stream_index(const paramdef_t *param, const size_t np
   }
 }
 
-void RCconfig_nr_macrlc(configmodule_interface_t *cfg, nr_cell_sched_t **out_cell)
+void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
 {
   int j = 0;
-  nr_cell_sched_t *cell = NULL;
 
   GET_PARAMS(GNBSParams, GNBSPARAMS_DESC, NULL);
   GET_PARAMS_LIST(GNBParamList, GNBParams, GNBPARAMS_DESC, GNB_CONFIG_STRING_GNB_LIST, NULL, GNBPARAMS_CHECK);
@@ -1661,7 +1660,9 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg, nr_cell_sched_t **out_cel
           config.pucch.failure_thres);
 
     ngran_node_t node_type = get_node_type();
-    mac_top_init_gNB(node_type, scc, &config, &default_rlc_config, &cell);
+    mac_top_init_gNB(node_type, &default_rlc_config);
+    nr_cell_sched_t *cell = &RC.nrmac[0]->cells[0];
+    mac_init_cell(scc, &config, cell);
 
     for (j = 0; j < RC.nb_nr_macrlc_inst; j++) {
       gNB_MAC_INST *nrmac = RC.nrmac[j];
@@ -1853,7 +1854,6 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg, nr_cell_sched_t **out_cel
 
     free(name); /* read_du_cell_info() allocated memory */
 
-    *out_cell = cell;
   } else { // MacRLC_ParamList.numelt > 0
     LOG_E(PHY, "No %s configuration found\n", MACRLC_LIST);
     // AssertFatal (0,"No " MACRLC_LIST " configuration found");
