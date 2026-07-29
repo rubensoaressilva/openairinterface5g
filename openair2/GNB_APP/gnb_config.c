@@ -965,8 +965,7 @@ static int read_du_cell_info(bool separate_du,
                              f1ap_served_cell_info_t *info,
                              int max_cell_info)
 {
-  AssertFatal(max_cell_info == 1, "only one cell supported\n");
-  memset(info, 0, sizeof(*info));
+  memset(info, 0, sizeof(*info) * max_cell_info);
 
   GET_PARAMS(GNBSParams, GNBSPARAMS_DESC, NULL);
   int num_gnbs = GNBSParams[GNB_ACTIVE_GNBS_IDX].numelt;
@@ -1002,20 +1001,22 @@ static int read_du_cell_info(bool separate_du,
   GET_PARAMS_LIST(CellParamList, CellParams, CELLPARAMS_DESC, GNB_CONFIG_STRING_CELLS_LIST, gnb0_path, CELLPARAMS_CHECK);
   AssertFatal(CellParamList.numelt >= 1, "No cells configured in gNBs.[0].cells\n");
 
-  info->tac = malloc(sizeof(*info->tac));
-  AssertFatal(info->tac != NULL, "out of memory\n");
-  *info->tac = *CellParamList.paramarray[0][CELL_TRACKING_AREA_CODE_IDX].uptr;
+  int n = CellParamList.numelt < max_cell_info ? CellParamList.numelt : max_cell_info;
+  for (int c = 0; c < n; c++) {
+    info[c].tac = malloc(sizeof(*info[c].tac));
+    AssertFatal(info[c].tac != NULL, "out of memory\n");
+    *info[c].tac = *CellParamList.paramarray[c][CELL_TRACKING_AREA_CODE_IDX].uptr;
 
-  // PLMN
-  plmn_id_t p[PLMN_LIST_MAX_SIZE] = {0};
-  set_plmn_config(p, 0, 0);
-  info->plmn = p[0];
-  info->nr_cellid = (uint64_t) * (CellParamList.paramarray[0][CELL_NRCELLID_IDX].u64ptr);
+    plmn_id_t p[PLMN_LIST_MAX_SIZE] = {0};
+    set_plmn_config(p, 0, c);
+    // PLMN
+    info[c].plmn = p[0];
+    info[c].nr_cellid = (uint64_t) * (CellParamList.paramarray[c][CELL_NRCELLID_IDX].u64ptr);
+    // SNSSAI
+    info[c].num_ssi = set_snssai_config(info[c].nssai, MAX_NUM_SLICES, 0, c, 0);
+  }
 
-  // SNSSAI
-  info->num_ssi = set_snssai_config(info->nssai, MAX_NUM_SLICES, 0, 0, 0);
-
-  return 1;
+  return n;
 }
 
 f1ap_tdd_info_t read_tdd_config(const NR_ServingCellConfigCommon_t *scc)
@@ -1857,24 +1858,26 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
     uint64_t gnb_du_id = 0;
     uint32_t gnb_id = 0;
     char *name = NULL;
-    f1ap_served_cell_info_t info;
-    read_du_cell_info(NODE_IS_DU(node_type), &gnb_id, &gnb_du_id, &name, &info, 1);
-    cell->nr_pci = info.nr_pci;
-    cell->nr_cellid = info.nr_cellid;
-    cell->plmn = info.plmn;
+    f1ap_served_cell_info_t cell_info[NR_MAX_CELLS] = {0};
+    int num_cell_infos = read_du_cell_info(NODE_IS_DU(node_type), &gnb_id, &gnb_du_id, &name, cell_info, num_cells);
+    for (int c = 0; c < num_cell_infos; c++) {
+      // nr_pci is already set from scc->physCellId by mac_init_cell above; do not overwrite
+      RC.nrmac[0]->cells[c].nr_cellid = cell_info[c].nr_cellid;
+      RC.nrmac[0]->cells[c].plmn = cell_info[c].plmn;
+    }
     gNB_MAC_INST *nrmac = RC.nrmac[0];
     NR_COMMON_channels_t *cc = &cell->common_channels;
     cc->du_SIBs = fill_du_sibs(CellParamList.paramarray[0]);
 
     if (IS_SA_MODE(get_softmodem_params()))
-      nr_mac_configure_sib1(cell, &info.plmn, info.nr_cellid, *info.tac);
+      nr_mac_configure_sib1(cell, &cell_info[0].plmn, cell_info[0].nr_cellid, *cell_info[0].tac);
 
     // read F1 Setup information from config and generated MIB/SIB1
     // and store it at MAC for sending later
     NR_BCCH_BCH_Message_t *mib = cc->mib;
     const NR_BCCH_DL_SCH_Message_t *sib1 = cc->sib1;
     seq_arr_t *du_SIBs = cc->du_SIBs;
-    f1ap_setup_req_t *req = RC_read_F1Setup(gnb_du_id, name, &info, scc, mib, sib1, du_SIBs);
+    f1ap_setup_req_t *req = RC_read_F1Setup(gnb_du_id, name, &cell_info[0], scc, mib, sib1, du_SIBs);
     AssertFatal(req != NULL, "could not read F1 Setup information\n");
     LOG_I(GNB_APP, "Configured DU: cell ID %ld, PCI %d\n", req->cell[0].info.nr_cellid, req->cell[0].info.nr_pci);
     nrmac->f1_config.setup_req = req;
