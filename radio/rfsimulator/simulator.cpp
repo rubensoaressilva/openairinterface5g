@@ -1666,3 +1666,4 @@ extern "C" __attribute__((__visibility__("default"))) int device_init(openair0_d
 
   return 0;
 }
+
