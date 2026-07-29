@@ -759,11 +759,11 @@ static int get_prb_blacklist(uint16_t *prbbl)
   return num_prbbl;
 }
 
-static void set_antenna_ports(paramlist_def_t *p, int *N1, int *N2, int *XP)
+static void set_antenna_ports(const paramdef_t *cellp, int *N1, int *N2, int *XP)
 {
-  *N1 = *p->paramarray[0][CELL_PDSCH_ANTENNAPORTS_N1_IDX].iptr;
-  *N2 = *p->paramarray[0][CELL_PDSCH_ANTENNAPORTS_N2_IDX].iptr;
-  *XP = *p->paramarray[0][CELL_PDSCH_ANTENNAPORTS_XP_IDX].iptr;
+  *N1 = *cellp[CELL_PDSCH_ANTENNAPORTS_N1_IDX].iptr;
+  *N2 = *cellp[CELL_PDSCH_ANTENNAPORTS_N2_IDX].iptr;
+  *XP = *cellp[CELL_PDSCH_ANTENNAPORTS_XP_IDX].iptr;
 }
 
 void RCconfig_NR_L1(void)
@@ -1531,7 +1531,7 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
   GET_PARAMS_LIST(MacRLC_ParamList, MacRLC_Params, MACRLCPARAMS_DESC, MACRLC_LIST, NULL, MACRLCPARAMS_CHECK);
   nr_mac_config_t config = {0};
   nr_pdsch_AntennaPorts_t *p = &config.pdsch_AntennaPorts;
-  set_antenna_ports(&CellParamList, &p->N1, &p->N2, &p->XP);
+  set_antenna_ports(CellParamList.paramarray[0], &p->N1, &p->N2, &p->XP);
   config.pusch_AntennaPorts = *CellParamList.paramarray[0][CELL_PUSCH_ANTENNAPORTS_IDX].iptr;
   LOG_I(GNB_APP,
         "pdsch_AntennaPorts N1 %d N2 %d XP %d pusch_AntennaPorts %d\n",
@@ -1559,38 +1559,6 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
     num_tx = p->XP * p->N1 * p->N2 * beams_per_period;
     LOG_E(GNB_APP, "RU information not present in config file. Assuming physical antenna ports equal to logical antenna ports %d\n", num_tx);
   }
-  config.minRXTXTIME = *CellParamList.paramarray[0][CELL_MINRXTXTIME_IDX].iptr;
-  LOG_I(GNB_APP, "minTXRXTIME %d\n", config.minRXTXTIME);
-  config.do_TCI = *CellParamList.paramarray[0][CELL_DO_TCI_IDX].iptr;
-  config.do_CSIRS = *CellParamList.paramarray[0][CELL_DO_CSIRS_IDX].iptr;
-  const char *srs_type_s = *CellParamList.paramarray[0][CELL_DO_SRS_IDX].strptr;
-  config.do_SRS = config_get_processedint(cfg, &CellParamList.paramarray[0][CELL_DO_SRS_IDX]);
-  config.max_num_rsrp = *CellParamList.paramarray[0][CELL_LIMIT_RSRP_REPORT_IDX].iptr;
-  const char *report_type_s = *CellParamList.paramarray[0][CELL_CONFIG_REP_IDX].strptr;
-  config.report_type = config_get_processedint(cfg, &CellParamList.paramarray[0][CELL_CONFIG_REP_IDX]);
-  config.force_256qam_off = *CellParamList.paramarray[0][CELL_FORCE256QAMOFF_IDX].iptr;
-  config.force_UL256qam_off = *CellParamList.paramarray[0][CELL_FORCEUL256QAMOFF_IDX].iptr;
-  config.use_deltaMCS = *CellParamList.paramarray[0][CELL_USE_DELTA_MCS_IDX].iptr != 0;
-  config.maxMIMO_layers = *CellParamList.paramarray[0][CELL_MAXMIMOLAYERS_IDX].iptr;
-  config.disable_harq = *CellParamList.paramarray[0][CELL_DISABLE_HARQ_IDX].iptr;
-  config.num_dlharq = *CellParamList.paramarray[0][CELL_NUM_DL_HARQ_IDX].iptr;
-  config.num_ulharq = *CellParamList.paramarray[0][CELL_NUM_UL_HARQ_IDX].iptr;
-  if (config.disable_harq)
-    LOG_W(GNB_APP, "\"disable_harq\" is a REL17 feature and is incompatible with REL15 and REL16 UEs!\n");
-  LOG_I(GNB_APP,
-        "CSI-RS %d, SRS %s, report type %d (%s), 256 QAM %s, delta_MCS %s, maxMIMO_Layers %d, HARQ feedback %s, num DLHARQ:%d, num ULHARQ:%d\n",
-        config.do_CSIRS,
-        srs_type_s,
-        config.report_type,
-        report_type_s,
-        config.force_256qam_off ? "force off" : "may be on",
-        config.use_deltaMCS ? "on" : "off",
-        config.maxMIMO_layers,
-        config.disable_harq ? "disabled" : "enabled",
-        config.num_dlharq,
-        config.num_ulharq);
-  int tot_ant = config.pdsch_AntennaPorts.N1 * config.pdsch_AntennaPorts.N2 * config.pdsch_AntennaPorts.XP;
-  AssertFatal(config.maxMIMO_layers != 0 && config.maxMIMO_layers <= tot_ant, "Invalid maxMIMO_layers %d\n", config.maxMIMO_layers);
 
   config.redcap = get_redcap_config(0);
   config.ptrs = get_ptrs_config();
@@ -1623,35 +1591,6 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
         config.timer_config.n311,
         config.timer_config.t319);
 
-  // Construct default aggragation level list or read from config
-  int uess_num_agg_level_candidates[NUM_PDCCH_AGG_LEVELS];
-  uess_num_agg_level_candidates[PDCCH_AGG_LEVEL1] = NR_SearchSpace__nrofCandidates__aggregationLevel1_n0;
-  uess_num_agg_level_candidates[PDCCH_AGG_LEVEL2] = NR_SearchSpace__nrofCandidates__aggregationLevel2_n2;
-  uess_num_agg_level_candidates[PDCCH_AGG_LEVEL4] = NR_SearchSpace__nrofCandidates__aggregationLevel4_n0;
-  uess_num_agg_level_candidates[PDCCH_AGG_LEVEL8] = NR_SearchSpace__nrofCandidates__aggregationLevel8_n0;
-  uess_num_agg_level_candidates[PDCCH_AGG_LEVEL16] = NR_SearchSpace__nrofCandidates__aggregationLevel16_n0;
-  int* agg_level_list = uess_num_agg_level_candidates;
-  int num_agg_levels = 5;
-  if (CellParamList.paramarray[0][CELL_UESS_AGG_LEVEL_LIST_IDX].numelt > 0) {
-    agg_level_list = CellParamList.paramarray[0][CELL_UESS_AGG_LEVEL_LIST_IDX].iptr;
-    num_agg_levels = CellParamList.paramarray[0][CELL_UESS_AGG_LEVEL_LIST_IDX].numelt;
-  }
-  memcpy(config.num_agg_level_candidates, agg_level_list, sizeof(int) * num_agg_levels);
-  LOG_I(NR_MAC,
-        "Candidates per PDCCH aggregation level on UESS: L1: %d, L2: %d, L4: %d, L8: %d, L16: %d\n",
-        config.num_agg_level_candidates[PDCCH_AGG_LEVEL1],
-        config.num_agg_level_candidates[PDCCH_AGG_LEVEL2],
-        config.num_agg_level_candidates[PDCCH_AGG_LEVEL4],
-        config.num_agg_level_candidates[PDCCH_AGG_LEVEL8],
-        config.num_agg_level_candidates[PDCCH_AGG_LEVEL16]);
-
-  NR_ServingCellConfigCommon_t *scc = get_scc_config(0, config.minRXTXTIME, config.do_SRS);
-  // BWP
-  get_bwp_config(&config, scc);
-  AssertFatal(config.num_additional_bwps <= 4, "Impossible to configure more than 4 additional BWPs\n");
-  config.first_active_bwp = *CellParamList.paramarray[0][CELL_1ST_ACTIVE_BWP_IDX].iptr;
-  AssertFatal(config.first_active_bwp <= config.num_additional_bwps, "1st active BWP does not belog to the configured BWPs\n");
-
   if (MacRLC_ParamList.numelt > 0) {
     AssertFatal(MacRLC_ParamList.numelt == 1, "only one MACRLCs section supported!\n");
     AssertFatal(MacRLC_ParamList.numelt == RC.nb_nr_macrlc_inst, "only one MACRLCs section supported!\n");
@@ -1659,29 +1598,98 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
     nr_rlc_configuration_t default_rlc_config;
     config_rlc(cfg, &default_rlc_config);
 
-    const paramdef_t *cell_params = CellParamList.paramarray[0];
-    const int cell_np = sizeofArray(CellParams);
-    config.pusch.target_snrx10 = *gpd(cell_params, cell_np, MACRLC_PUSCHTARGETSNRX10)->iptr;
-    config.pusch.rssi_threshold = *gpd(cell_params, cell_np, MACRLC_PUSCH_RSSI_THRESHOLD)->iptr;
-    config.pucch.rssi_threshold = *gpd(cell_params, cell_np, MACRLC_PUCCH_RSSI_THRESHOLD)->iptr;
-    config.pucch.target_snrx10 = *gpd(cell_params, cell_np, MACRLC_PUCCHTARGETSNRX10)->iptr;
-    config.ul_prbblack_SNR_threshold = *gpd(cell_params, cell_np, MACRLC_UL_PRBBLACK_SNR_THRESHOLD)->iptr;
-    config.pucch.failure_thres = *gpd(cell_params, cell_np, MACRLC_PUCCHFAILURETHRES)->iptr;
-    config.pusch.failure_thres = *gpd(cell_params, cell_np, MACRLC_PUSCHFAILURETHRES)->iptr;
-
-    LOG_I(NR_MAC,
-          "PUSCH Target %d RSSI thresh %d Failure %d, PUCCH Target %d RSSI thresh %d Failure %d\n",
-          config.pusch.target_snrx10,
-          config.pusch.rssi_threshold,
-          config.pusch.failure_thres,
-          config.pucch.target_snrx10,
-          config.pucch.rssi_threshold,
-          config.pucch.failure_thres);
-
     ngran_node_t node_type = get_node_type();
     mac_top_init_gNB(node_type, &default_rlc_config);
+
+    int num_cells = CellParamList.numelt;
+    AssertFatal(num_cells <= NR_MAX_CELLS, "configured cells %d exceeds NR_MAX_CELLS %d\n", num_cells, NR_MAX_CELLS);
+    for (int c = 0; c < num_cells; c++) {
+      const paramdef_t *cp = CellParamList.paramarray[c];
+      const int cell_np_c = sizeofArray(CellParams);
+      config.minRXTXTIME = *cp[CELL_MINRXTXTIME_IDX].iptr;
+      config.do_TCI = *cp[CELL_DO_TCI_IDX].iptr;
+      config.do_CSIRS = *cp[CELL_DO_CSIRS_IDX].iptr;
+      const char *srs_type_s = *cp[CELL_DO_SRS_IDX].strptr;
+      config.do_SRS = config_get_processedint(cfg, &CellParamList.paramarray[c][CELL_DO_SRS_IDX]);
+      config.max_num_rsrp = *cp[CELL_LIMIT_RSRP_REPORT_IDX].iptr;
+      const char *report_type_s = *cp[CELL_CONFIG_REP_IDX].strptr;
+      config.report_type = config_get_processedint(cfg, &CellParamList.paramarray[c][CELL_CONFIG_REP_IDX]);
+      config.force_256qam_off = *cp[CELL_FORCE256QAMOFF_IDX].iptr;
+      config.force_UL256qam_off = *cp[CELL_FORCEUL256QAMOFF_IDX].iptr;
+      config.use_deltaMCS = *cp[CELL_USE_DELTA_MCS_IDX].iptr != 0;
+      config.maxMIMO_layers = *cp[CELL_MAXMIMOLAYERS_IDX].iptr;
+      config.disable_harq = *cp[CELL_DISABLE_HARQ_IDX].iptr;
+      config.num_dlharq = *cp[CELL_NUM_DL_HARQ_IDX].iptr;
+      config.num_ulharq = *cp[CELL_NUM_UL_HARQ_IDX].iptr;
+      if (config.disable_harq)
+        LOG_W(GNB_APP, "\"disable_harq\" is a REL17 feature and is incompatible with REL15 and REL16 UEs!\n");
+      LOG_I(GNB_APP,
+            "cell %d: CSI-RS %d, SRS %s, report type %d (%s), 256 QAM %s, delta_MCS %s, maxMIMO_Layers %d, HARQ feedback %s, num DLHARQ:%d, num ULHARQ:%d\n",
+            c,
+            config.do_CSIRS,
+            srs_type_s,
+            config.report_type,
+            report_type_s,
+            config.force_256qam_off ? "force off" : "may be on",
+            config.use_deltaMCS ? "on" : "off",
+            config.maxMIMO_layers,
+            config.disable_harq ? "disabled" : "enabled",
+            config.num_dlharq,
+            config.num_ulharq);
+      int tot_ant = config.pdsch_AntennaPorts.N1 * config.pdsch_AntennaPorts.N2 * config.pdsch_AntennaPorts.XP;
+      AssertFatal(config.maxMIMO_layers != 0 && config.maxMIMO_layers <= tot_ant, "Invalid maxMIMO_layers %d\n", config.maxMIMO_layers);
+
+      // Construct default aggregation level list or read from config
+      int uess_num_agg_level_candidates[NUM_PDCCH_AGG_LEVELS];
+      uess_num_agg_level_candidates[PDCCH_AGG_LEVEL1] = NR_SearchSpace__nrofCandidates__aggregationLevel1_n0;
+      uess_num_agg_level_candidates[PDCCH_AGG_LEVEL2] = NR_SearchSpace__nrofCandidates__aggregationLevel2_n2;
+      uess_num_agg_level_candidates[PDCCH_AGG_LEVEL4] = NR_SearchSpace__nrofCandidates__aggregationLevel4_n0;
+      uess_num_agg_level_candidates[PDCCH_AGG_LEVEL8] = NR_SearchSpace__nrofCandidates__aggregationLevel8_n0;
+      uess_num_agg_level_candidates[PDCCH_AGG_LEVEL16] = NR_SearchSpace__nrofCandidates__aggregationLevel16_n0;
+      int *agg_level_list = uess_num_agg_level_candidates;
+      int num_agg_levels = 5;
+      if (cp[CELL_UESS_AGG_LEVEL_LIST_IDX].numelt > 0) {
+        agg_level_list = cp[CELL_UESS_AGG_LEVEL_LIST_IDX].iptr;
+        num_agg_levels = cp[CELL_UESS_AGG_LEVEL_LIST_IDX].numelt;
+      }
+      memcpy(config.num_agg_level_candidates, agg_level_list, sizeof(int) * num_agg_levels);
+      LOG_I(NR_MAC,
+            "cell %d: Candidates per PDCCH aggregation level on UESS: L1: %d, L2: %d, L4: %d, L8: %d, L16: %d\n",
+            c,
+            config.num_agg_level_candidates[PDCCH_AGG_LEVEL1],
+            config.num_agg_level_candidates[PDCCH_AGG_LEVEL2],
+            config.num_agg_level_candidates[PDCCH_AGG_LEVEL4],
+            config.num_agg_level_candidates[PDCCH_AGG_LEVEL8],
+            config.num_agg_level_candidates[PDCCH_AGG_LEVEL16]);
+
+      config.pusch.target_snrx10 = *gpd(cp, cell_np_c, MACRLC_PUSCHTARGETSNRX10)->iptr;
+      config.pusch.rssi_threshold = *gpd(cp, cell_np_c, MACRLC_PUSCH_RSSI_THRESHOLD)->iptr;
+      config.pucch.rssi_threshold = *gpd(cp, cell_np_c, MACRLC_PUCCH_RSSI_THRESHOLD)->iptr;
+      config.pucch.target_snrx10 = *gpd(cp, cell_np_c, MACRLC_PUCCHTARGETSNRX10)->iptr;
+      config.ul_prbblack_SNR_threshold = *gpd(cp, cell_np_c, MACRLC_UL_PRBBLACK_SNR_THRESHOLD)->iptr;
+      config.pucch.failure_thres = *gpd(cp, cell_np_c, MACRLC_PUCCHFAILURETHRES)->iptr;
+      config.pusch.failure_thres = *gpd(cp, cell_np_c, MACRLC_PUSCHFAILURETHRES)->iptr;
+      LOG_I(NR_MAC,
+            "cell %d: PUSCH Target %d RSSI thresh %d Failure %d, PUCCH Target %d RSSI thresh %d Failure %d\n",
+            c,
+            config.pusch.target_snrx10,
+            config.pusch.rssi_threshold,
+            config.pusch.failure_thres,
+            config.pucch.target_snrx10,
+            config.pucch.rssi_threshold,
+            config.pucch.failure_thres);
+
+      NR_ServingCellConfigCommon_t *scc_c = get_scc_config(c, config.minRXTXTIME, config.do_SRS);
+      get_bwp_config(&config, scc_c);
+      AssertFatal(config.num_additional_bwps <= 4, "Impossible to configure more than 4 additional BWPs\n");
+      config.first_active_bwp = *cp[CELL_1ST_ACTIVE_BWP_IDX].iptr;
+      AssertFatal(config.first_active_bwp <= config.num_additional_bwps, "1st active BWP does not belong to the configured BWPs\n");
+      mac_init_cell(scc_c, &config, &RC.nrmac[0]->cells[c]);
+    }
+    const paramdef_t *cell_params = CellParamList.paramarray[0];
+    const int cell_np = sizeofArray(CellParams);
     nr_cell_sched_t *cell = &RC.nrmac[0]->cells[0];
-    mac_init_cell(scc, &config, cell);
+    NR_ServingCellConfigCommon_t *scc = cell->common_channels.ServingCellConfigCommon;
 
     for (j = 0; j < RC.nb_nr_macrlc_inst; j++) {
       gNB_MAC_INST *nrmac = RC.nrmac[j];
