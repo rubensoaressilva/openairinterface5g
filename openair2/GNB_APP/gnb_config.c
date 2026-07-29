@@ -847,7 +847,7 @@ bool is_pattern2_config(paramdef_t *param)
   return true;
 }
 
-static NR_ServingCellConfigCommon_t *get_scc_config(int minRXTXTIME, int do_SRS)
+static NR_ServingCellConfigCommon_t *get_scc_config(int cell_idx, int minRXTXTIME, int do_SRS)
 {
   NR_ServingCellConfigCommon_t *scc = calloc_or_fail(1, sizeof(*scc));
   uint64_t ssb_bitmap=0xff;
@@ -861,7 +861,7 @@ static NR_ServingCellConfigCommon_t *get_scc_config(int minRXTXTIME, int do_SRS)
            GNB_CONFIG_STRING_GNB_LIST,
            0,
            GNB_CONFIG_STRING_CELLS_LIST,
-           0);
+           cell_idx);
   GET_PARAMS_LIST(SCCsParamList, SCCsParams, SCCPARAMS_DESC(scc), GNB_CONFIG_STRING_SERVINGCELLCONFIGCOMMON, aprefix);
   GET_PARAMS_LIST(MsgASCCsParamList, MsgASCCsParams, MSGASCCPARAMS_DESC(scc), GNB_CONFIG_STRING_SERVINGCELLCONFIGCOMMON, aprefix);
 
@@ -872,7 +872,7 @@ static NR_ServingCellConfigCommon_t *get_scc_config(int minRXTXTIME, int do_SRS)
              GNB_CONFIG_STRING_GNB_LIST,
              0,
              GNB_CONFIG_STRING_CELLS_LIST,
-             0,
+             cell_idx,
              GNB_CONFIG_STRING_SERVINGCELLCONFIGCOMMON,
              0);
     GET_PARAMS(SCCsParams, SCCPARAMS_DESC(scc), aprefix);
@@ -888,7 +888,7 @@ static NR_ServingCellConfigCommon_t *get_scc_config(int minRXTXTIME, int do_SRS)
              GNB_CONFIG_STRING_GNB_LIST,
              0,
              GNB_CONFIG_STRING_CELLS_LIST,
-             0,
+             cell_idx,
              GNB_CONFIG_STRING_SERVINGCELLCONFIGCOMMON,
              0,
              SCC_PATTERN2_STRING_CONFIG);
@@ -1645,7 +1645,7 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
         config.num_agg_level_candidates[PDCCH_AGG_LEVEL8],
         config.num_agg_level_candidates[PDCCH_AGG_LEVEL16]);
 
-  NR_ServingCellConfigCommon_t *scc = get_scc_config(config.minRXTXTIME, config.do_SRS);
+  NR_ServingCellConfigCommon_t *scc = get_scc_config(0, config.minRXTXTIME, config.do_SRS);
   // BWP
   get_bwp_config(&config, scc);
   AssertFatal(config.num_additional_bwps <= 4, "Impossible to configure more than 4 additional BWPs\n");
