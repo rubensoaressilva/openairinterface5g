@@ -1191,7 +1191,7 @@ bool nr_update_sib19(const gnb_sat_position_update_t *sat_position)
   return updated;
 }
 // TODO: ask Robert where this is used, and if it's okay to change, I can't find references
-bool nr_trigger_bwp_switch(gNB_MAC_INST *nrmac,nr_cell_sched_t *cell, uint16_t rnti, int bwp_id)
+bool nr_trigger_bwp_switch(gNB_MAC_INST *nrmac, uint16_t rnti, int bwp_id)
 {
   NR_SCHED_LOCK(&nrmac->sched_lock);
   NR_UE_info_t *UE = find_nr_UE(&nrmac->UE_info, rnti);
@@ -1201,7 +1201,7 @@ bool nr_trigger_bwp_switch(gNB_MAC_INST *nrmac,nr_cell_sched_t *cell, uint16_t r
   } else if (UE->current_DL_BWP.bwp_id == bwp_id) {
     LOG_W(NR_MAC, "UE %04x is already on BWP ID %d, not triggering reconfiguration\n", rnti, bwp_id);
   } else { // UE != NULL && current_DL_BWP.bwp_id != bwp_id
-    nr_mac_trigger_reconfiguration(nrmac, cell, UE, bwp_id, false);
+    nr_mac_trigger_reconfiguration(nrmac, UE->cell, UE, bwp_id, false);
     success = true;
   }
   NR_SCHED_UNLOCK(&nrmac->sched_lock);
