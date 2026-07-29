@@ -13,6 +13,7 @@
 #include "common/config/config_userapi.h"
 #include "common/ngran_types.h"
 #include "RRC_nr_paramsvalues.h"
+#include "MACRLC_nr_paramdef.h"
 
 #ifdef LIBCONFIG_LONG
 #define libconfig_int long
@@ -101,6 +102,7 @@ typedef enum {
 #define GNB_CONFIG_STRING_CONFIG_REP                    "CSI_report_type"
 #define GNB_CONFIG_STRING_1ST_ACTIVE_BWP                "first_active_bwp"
 #define GNB_CONFIG_STRING_LIMIT_RSRP_REPORT             "max_num_RSRP_reported"
+#define GNB_CONFIG_STRING_CELLS_LIST                    "cells"
 
 #define GNB_CONFIG_HLP_STRING_ENABLE_SDAP               "set sdap-HeaderUL/DL present in RRC SDAP-Config (false = both absent)\n"
 #define GNB_CONFIG_HLP_FORCE256QAMOFF                   "suppress activation of 256 QAM despite UE support"
@@ -125,7 +127,6 @@ typedef enum {
 {GNB_CONFIG_STRING_GNB_ID,                       NULL,   0,           .uptr=NULL,   .defintval=0,                 TYPE_UINT,      0},  \
 {GNB_CONFIG_STRING_CELL_TYPE,                    NULL,   0,           .strptr=NULL, .defstrval="CELL_MACRO_GNB",  TYPE_STRING,    0},  \
 {GNB_CONFIG_STRING_GNB_NAME,                     NULL,   0,           .strptr=NULL, .defstrval="OAIgNodeB",       TYPE_STRING,    0},  \
-{GNB_CONFIG_STRING_TRACKING_AREA_CODE,           NULL,   0,           .uptr=NULL,   .defuintval=0,                TYPE_UINT,      0},  \
 {GNB_CONFIG_STRING_MOBILE_COUNTRY_CODE_OLD,      NULL,   0,           .strptr=NULL, .defstrval=NULL,              TYPE_STRING,    0},  \
 {GNB_CONFIG_STRING_MOBILE_NETWORK_CODE_OLD,      NULL,   0,           .strptr=NULL, .defstrval=NULL,              TYPE_STRING,    0},  \
 {GNB_CONFIG_STRING_TRANSPORT_S_PREFERENCE,       NULL,   0,           .strptr=NULL, .defstrval="local_mac",       TYPE_STRING,    0},  \
@@ -135,6 +136,55 @@ typedef enum {
 {GNB_CONFIG_STRING_REMOTE_S_PORTC,               NULL,   0,           .uptr=NULL,   .defuintval=50000,            TYPE_UINT,      0},  \
 {GNB_CONFIG_STRING_LOCAL_S_PORTD,                NULL,   0,           .uptr=NULL,   .defuintval=50001,            TYPE_UINT,      0},  \
 {GNB_CONFIG_STRING_REMOTE_S_PORTD,               NULL,   0,           .uptr=NULL,   .defuintval=50001,            TYPE_UINT,      0},  \
+{GNB_CONFIG_STRING_GNB_DU_ID, GNB_CONFIG_HLP_GNB_DU_ID,  0,           .u64ptr=NULL, .defint64val=1,               TYPE_UINT64,    0},  \
+{GNB_CONFIG_STRING_GNB_CU_UP_ID, GNB_CONFIG_HLP_GNB_CU_UP_ID, 0,      .u64ptr=NULL, .defint64val=1,               TYPE_UINT64,    0},  \
+}
+// clang-format on
+
+
+#define GNB_GNB_ID_IDX                  0
+#define GNB_CELL_TYPE_IDX               1
+#define GNB_GNB_NAME_IDX                2
+#define GNB_MOBILE_COUNTRY_CODE_IDX_OLD 3
+#define GNB_MOBILE_NETWORK_CODE_IDX_OLD 4
+#define GNB_TRANSPORT_S_PREFERENCE_IDX  5
+#define GNB_LOCAL_S_ADDRESS_IDX         6
+#define GNB_REMOTE_S_ADDRESS_IDX        7
+#define GNB_LOCAL_S_PORTC_IDX           8
+#define GNB_REMOTE_S_PORTC_IDX          9
+#define GNB_LOCAL_S_PORTD_IDX           10
+#define GNB_REMOTE_S_PORTD_IDX          11
+#define GNB_GNB_DU_ID_IDX               12
+#define GNB_GNB_CU_UP_ID_IDX            13
+
+#define TRACKING_AREA_CODE_OKRANGE {0x0001,0xFFFD}
+#define NUM_DL_HARQ_OKVALUES {2,4,6,8,10,12,16,32}
+#define NUM_UL_HARQ_OKVALUES {16,32}
+
+#define GNBPARAMS_CHECK {         \
+  { .s5 = { NULL } },             \
+  { .s5 = { NULL } },             \
+  { .s5 = { NULL } },             \
+  { .s5 = { NULL } },             \
+  { .s5 = { NULL } },             \
+  { .s5 = { NULL } },             \
+  { .s5 = { NULL } },             \
+  { .s5 = { NULL } },             \
+  { .s5 = { NULL } },             \
+  { .s5 = { NULL } },             \
+  { .s5 = { NULL } },             \
+  { .s5 = { NULL } },             \
+  { .s5 = { NULL } },             \
+  { .s5 = { NULL } },             \
+}
+
+/*---------------------------------------------------------------------------*/
+/* per-cell configuration parameters (gNBs.[n].cells.[n])                    */
+/*---------------------------------------------------------------------------*/
+// clang-format off
+#define CELLPARAMS_DESC {\
+/* per-cell scheduler/radio params (formerly in GNBPARAMS_DESC) */          \
+{GNB_CONFIG_STRING_TRACKING_AREA_CODE,           NULL,   0,           .uptr=NULL,   .defuintval=0,                TYPE_UINT,      0},  \
 {GNB_CONFIG_STRING_PDSCHANTENNAPORTS_N1, "horiz. log. antenna ports", 0,.iptr=NULL, .defintval=1,                 TYPE_INT,       0},  \
 {GNB_CONFIG_STRING_PDSCHANTENNAPORTS_N2, "vert. log. antenna ports", 0, .iptr=NULL, .defintval=1,                 TYPE_INT,       0},  \
 {GNB_CONFIG_STRING_PDSCHANTENNAPORTS_XP, "XP log. antenna ports",   0, .iptr=NULL,  .defintval=1,                 TYPE_INT,       0},  \
@@ -148,8 +198,6 @@ typedef enum {
 {GNB_CONFIG_STRING_UMONDEFAULTDRB,               NULL, PARAMFLAG_BOOL, .uptr=NULL,  .defuintval=0,                TYPE_UINT,      0},  \
 {GNB_CONFIG_STRING_FORCE256QAMOFF, GNB_CONFIG_HLP_FORCE256QAMOFF, PARAMFLAG_BOOL, .iptr=NULL, .defintval=0,       TYPE_INT,       0},  \
 {GNB_CONFIG_STRING_ENABLE_SDAP, GNB_CONFIG_HLP_STRING_ENABLE_SDAP, PARAMFLAG_BOOL,.iptr=NULL, .defintval=1,       TYPE_INT,       0},  \
-{GNB_CONFIG_STRING_GNB_DU_ID, GNB_CONFIG_HLP_GNB_DU_ID,  0,           .u64ptr=NULL, .defint64val=1,               TYPE_UINT64,    0},  \
-{GNB_CONFIG_STRING_GNB_CU_UP_ID, GNB_CONFIG_HLP_GNB_CU_UP_ID, 0,      .u64ptr=NULL, .defint64val=1,               TYPE_UINT64,    0},  \
 {GNB_CONFIG_STRING_USE_DELTA_MCS, GNB_CONFIG_HLP_USE_DELTA_MCS, 0,    .iptr=NULL,   .defintval=0,                 TYPE_INT,       0},  \
 {GNB_CONFIG_STRING_FORCEUL256QAMOFF, GNB_CONFIG_HLP_FORCEUL256QAMOFF, 0,.iptr=NULL, .defintval=0,                 TYPE_INT,       0},  \
 {GNB_CONFIG_STRING_MAXMIMOLAYERS, GNB_CONFIG_HLP_MAXMIMOLAYERS, 0,     .iptr=NULL,  .defintval=-1,                TYPE_INT,       0},  \
@@ -163,102 +211,154 @@ typedef enum {
 {GNB_CONFIG_STRING_CONFIG_REP, GNB_CONFIG_HLP_CONFIG_REP, 0,          .strptr=NULL, .defstrval="ssb_rsrp",        TYPE_STRING,    0},  \
 {GNB_CONFIG_STRING_1ST_ACTIVE_BWP,               NULL,   0,            .iptr=NULL,  .defintval=0,                 TYPE_INT,       0},  \
 {GNB_CONFIG_STRING_LIMIT_RSRP_REPORT,            NULL,   0,            .iptr=NULL,  .defintval=0,                 TYPE_INT,       0},  \
+/* per-cell radio params (formerly in MACRLCPARAMS_DESC) */                 \
+{MACRLC_ULSCH_MAX_FRAME_INACTIVITY,  NULL,                     0, .uptr=NULL,   .defintval=10,              TYPE_UINT,    0}, \
+{MACRLC_PUSCHTARGETSNRX10,           NULL,                     0, .iptr=NULL,   .defintval=200,             TYPE_INT,     0}, \
+{MACRLC_PUCCHTARGETSNRX10,           NULL,                     0, .iptr=NULL,   .defintval=150,             TYPE_INT,     0}, \
+{MACRLC_UL_PRBBLACK_SNR_THRESHOLD,   HLP_MACRLC_UL_PRBBLACK,   0, .iptr=NULL,   .defintval=10,              TYPE_INT,     0}, \
+{MACRLC_PUCCHFAILURETHRES,           NULL,                     0, .iptr=NULL,   .defintval=10,              TYPE_INT,     0}, \
+{MACRLC_PUSCHFAILURETHRES,           NULL,                     0, .iptr=NULL,   .defintval=10,              TYPE_INT,     0}, \
+{MACRLC_DL_BLER_TARGET_UPPER,        HLP_MACRLC_DL_BLER_UP,    0, .dblptr=NULL, .defdblval=0.15,            TYPE_DOUBLE,  0}, \
+{MACRLC_DL_BLER_TARGET_LOWER,        HLP_MACRLC_DL_BLER_LO,    0, .dblptr=NULL, .defdblval=0.05,            TYPE_DOUBLE,  0}, \
+{MACRLC_DL_MIN_MCS,                  HLP_MACRLC_DL_MIN_MCS,    0, .u8ptr=NULL,  .defintval=0,               TYPE_UINT8,   0}, \
+{MACRLC_DL_MAX_MCS,                  HLP_MACRLC_DL_MAX_MCS,    0, .u8ptr=NULL,  .defintval=28,              TYPE_UINT8,   0}, \
+{MACRLC_UL_BLER_TARGET_UPPER,        HLP_MACRLC_UL_BLER_UP,    0, .dblptr=NULL, .defdblval=0.15,            TYPE_DOUBLE,  0}, \
+{MACRLC_UL_BLER_TARGET_LOWER,        HLP_MACRLC_UL_BLER_LO,    0, .dblptr=NULL, .defdblval=0.05,            TYPE_DOUBLE,  0}, \
+{MACRLC_UL_MIN_MCS,                  HLP_MACRLC_UL_MIN_MCS,    0, .u8ptr=NULL,  .defintval=0,               TYPE_UINT8,   0}, \
+{MACRLC_UL_MAX_MCS,                  HLP_MACRLC_UL_MAX_MCS,    0, .u8ptr=NULL,  .defintval=28,              TYPE_UINT8,   0}, \
+{MACRLC_DL_HARQ_ROUND_MAX,           HLP_MACRLC_DL_HARQ_MAX,   0, .u8ptr=NULL,  .defintval=4,               TYPE_UINT8,   0}, \
+{MACRLC_UL_HARQ_ROUND_MAX,           HLP_MACRLC_UL_HARQ_MAX,   0, .u8ptr=NULL,  .defintval=4,               TYPE_UINT8,   0}, \
+{MACRLC_MIN_GRANT_PRB,               HLP_MACRLC_MIN_GRANT_PRB, 0, .u16ptr=NULL, .defintval=5,               TYPE_UINT16,  0}, \
+{MACRLC_IDENTITY_PM,                 HLP_MACRLC_IDENTITY_PM,   PARAMFLAG_BOOL, .u8ptr=NULL, .defintval=0,   TYPE_UINT8,   0}, \
+{MACRLC_ANALOG_BEAMFORMING,          HLP_MACRLC_AB,            0, .strptr=NULL, .defstrval="none",          TYPE_STRING,  0}, \
+{MACRLC_BEAM_DURATION,               HLP_MACRLC_BEAM_DURATION, 0, .u8ptr=NULL,  .defintval=1,               TYPE_UINT8,   0}, \
+{MACRLC_BEAMS_PERIOD,                HLP_MACRLC_BEAMS_PERIOD,  0, .u8ptr=NULL,  .defintval=1,               TYPE_UINT8,   0}, \
+{MACRLC_BEAM_WEIGHTS_LIST,           NULL,                     0, .iptr=NULL,   .defintarrayval=0,          TYPE_INTARRAY,0}, \
+{MACRLC_DBT_FILE,                    HLP_MACRLC_DBT_FILE,      0, .strptr=NULL, .defstrval=NULL,            TYPE_STRING,  0}, \
+{MACRLC_PUSCH_RSSI_THRESHOLD,        HLP_MACRLC_PUSCH_RSSI_THRESHOLD, \
+                                                                             0, .iptr=NULL,   .defintval=0,               TYPE_INT,     0}, \
+{MACRLC_PUCCH_RSSI_THRESHOLD,        HLP_MACRLC_PUCCH_RSSI_THRESHOLD, \
+                                                                             0, .iptr=NULL,   .defintval=0,               TYPE_INT,     0}, \
+{MACRLC_SPATIAL_STREAM_IDX,          HLP_MACRLC_SPATIAL_STREAM_INDEX, \
+                                                                             0, .uptr=NULL,   .defintarrayval=0,          TYPE_INTARRAY,0}, \
 }
 // clang-format on
 
+#define CELL_TRACKING_AREA_CODE_IDX      0
+#define CELL_PDSCH_ANTENNAPORTS_N1_IDX   1
+#define CELL_PDSCH_ANTENNAPORTS_N2_IDX   2
+#define CELL_PDSCH_ANTENNAPORTS_XP_IDX   3
+#define CELL_PUSCH_ANTENNAPORTS_IDX      4
+#define CELL_DO_TCI_IDX                  5
+#define CELL_DO_CSIRS_IDX                6
+#define CELL_DO_SRS_IDX                  7
+#define CELL_NRCELLID_IDX                8
+#define CELL_MINRXTXTIME_IDX             9
+#define CELL_ULPRBBLACKLIST_IDX          10
+#define CELL_UMONDEFAULTDRB_IDX          11
+#define CELL_FORCE256QAMOFF_IDX          12
+#define CELL_ENABLE_SDAP_IDX             13
+#define CELL_USE_DELTA_MCS_IDX           14
+#define CELL_FORCEUL256QAMOFF_IDX        15
+#define CELL_MAXMIMOLAYERS_IDX           16
+#define CELL_DISABLE_HARQ_IDX            17
+#define CELL_NUM_DL_HARQ_IDX             18
+#define CELL_NUM_UL_HARQ_IDX             19
+#define CELL_UESS_AGG_LEVEL_LIST_IDX     20
+#define CELL_CU_SIBS_IDX                 21
+#define CELL_DU_SIBS_IDX                 22
+#define CELL_CONFIG_REP_IDX              23
+#define CELL_1ST_ACTIVE_BWP_IDX          24
+#define CELL_LIMIT_RSRP_REPORT_IDX       25
+#define CELL_ULSCH_MAX_FRAME_INACTIVITY_IDX 26
+#define CELL_PUSCHTARGETSNRX10_IDX       27
+#define CELL_PUCCHTARGETSNRX10_IDX       28
+#define CELL_UL_PRBBLACK_SNR_THRESHOLD_IDX 29
+#define CELL_PUCCHFAILURETHRES_IDX       30
+#define CELL_PUSCHFAILURETHRES_IDX       31
+#define CELL_DL_BLER_TARGET_UPPER_IDX    32
+#define CELL_DL_BLER_TARGET_LOWER_IDX    33
+#define CELL_DL_MIN_MCS_IDX              34
+#define CELL_DL_MAX_MCS_IDX              35
+#define CELL_UL_BLER_TARGET_UPPER_IDX    36
+#define CELL_UL_BLER_TARGET_LOWER_IDX    37
+#define CELL_UL_MIN_MCS_IDX              38
+#define CELL_UL_MAX_MCS_IDX              39
+#define CELL_DL_HARQ_ROUND_MAX_IDX       40
+#define CELL_UL_HARQ_ROUND_MAX_IDX       41
+#define CELL_MIN_GRANT_PRB_IDX           42
+#define CELL_IDENTITY_PM_IDX             43
+#define CELL_ANALOG_BEAMFORMING_IDX      44
+#define CELL_BEAM_DURATION_IDX           45
+#define CELL_BEAMS_PERIOD_IDX            46
+#define CELL_BEAM_WEIGHTS_LIST_IDX       47
+#define CELL_DBT_FILE_IDX                48
+#define CELL_PUSCH_RSSI_THRESHOLD_IDX    49
+#define CELL_PUCCH_RSSI_THRESHOLD_IDX    50
+#define CELL_SPATIAL_STREAM_IDX_IDX      51
 
-#define GNB_GNB_ID_IDX                  0
-#define GNB_CELL_TYPE_IDX               1
-#define GNB_GNB_NAME_IDX                2
-#define GNB_TRACKING_AREA_CODE_IDX      3
-#define GNB_MOBILE_COUNTRY_CODE_IDX_OLD 4
-#define GNB_MOBILE_NETWORK_CODE_IDX_OLD 5
-#define GNB_TRANSPORT_S_PREFERENCE_IDX  6
-#define GNB_LOCAL_S_ADDRESS_IDX         7
-#define GNB_REMOTE_S_ADDRESS_IDX        8
-#define GNB_LOCAL_S_PORTC_IDX           9
-#define GNB_REMOTE_S_PORTC_IDX          10
-#define GNB_LOCAL_S_PORTD_IDX           11
-#define GNB_REMOTE_S_PORTD_IDX          12
-#define GNB_PDSCH_ANTENNAPORTS_N1_IDX   13
-#define GNB_PDSCH_ANTENNAPORTS_N2_IDX   14
-#define GNB_PDSCH_ANTENNAPORTS_XP_IDX   15
-#define GNB_PUSCH_ANTENNAPORTS_IDX      16
-#define GNB_DO_TCI_IDX                  17
-#define GNB_DO_CSIRS_IDX                18
-#define GNB_DO_SRS_IDX                  19
-#define GNB_NRCELLID_IDX                20
-#define GNB_MINRXTXTIME_IDX             21
-#define GNB_ULPRBBLACKLIST_IDX          22
-#define GNB_UMONDEFAULTDRB_IDX          23
-#define GNB_FORCE256QAMOFF_IDX          24
-#define GNB_ENABLE_SDAP_IDX             25
-#define GNB_GNB_DU_ID_IDX               26
-#define GNB_GNB_CU_UP_ID_IDX            27
-#define GNB_USE_DELTA_MCS_IDX           28
-#define GNB_FORCEUL256QAMOFF_IDX        29
-#define GNB_MAXMIMOLAYERS_IDX           30
-#define GNB_DISABLE_HARQ_IDX            31
-#define GNB_NUM_DL_HARQ_IDX             32
-#define GNB_NUM_UL_HARQ_IDX             33
-#define GNB_UESS_AGG_LEVEL_LIST_IDX     34
-#define GNB_CU_SIBS_IDX                 35
-#define GNB_DU_SIBS_IDX                 36
-#define GNB_CONFIG_REP_IDX              37
-#define GNB_1ST_ACTIVE_BWP_IDX          38
-#define GNB_LIMIT_RSRP_REPORT_IDX       39
-
-#define TRACKING_AREA_CODE_OKRANGE {0x0001,0xFFFD}
-#define NUM_DL_HARQ_OKVALUES {2,4,6,8,10,12,16,32}
-#define NUM_UL_HARQ_OKVALUES {16,32}
-
-#define GNBPARAMS_CHECK {                                         \
-  { .s5 = { NULL } },                                             \
-  { .s5 = { NULL } },                                             \
-  { .s5 = { NULL } },                                             \
-  { .s2 = { config_check_intrange, TRACKING_AREA_CODE_OKRANGE } },\
-  { .s5 = { NULL } },                                             \
-  { .s5 = { NULL } },                                             \
-  { .s5 = { NULL } },                                             \
-  { .s5 = { NULL } },                                             \
-  { .s5 = { NULL } },                                             \
-  { .s5 = { NULL } },                                             \
-  { .s5 = { NULL } },                                             \
-  { .s5 = { NULL } },                                             \
-  { .s5 = { NULL } },                                             \
-  { .s5 = { NULL } },                                             \
-  { .s5 = { NULL } },                                             \
-  { .s5 = { NULL } },                                             \
-  { .s5 = { NULL } },                                             \
-  { .s5 = { NULL } },                                             \
-  { .s5 = { NULL } },                                             \
-  { .s3a = { config_checkstr_assign_integer, \
-             {"none", "periodic", "aperiodic"}, \
-             {NO_SRS, PERIODIC_SRS, APERIODIC_SRS}, \
-             3 } }, \
-  { .s5 = { NULL } },                                             \
-  { .s5 = { NULL } },                                             \
-  { .s5 = { NULL } },                                             \
-  { .s5 = { NULL } },                                             \
-  { .s5 = { NULL } },                                             \
-  { .s5 = { NULL } },                                             \
-  { .s5 = { NULL } },                                             \
-  { .s5 = { NULL } },                                             \
-  { .s5 = { NULL } },                                             \
-  { .s5 = { NULL } },                                             \
-  { .s5 = { NULL } },                                             \
-  { .s5 = { NULL } },                                             \
-  { .s1 =  { config_check_intval, NUM_DL_HARQ_OKVALUES,8 } },     \
-  { .s1 =  { config_check_intval, NUM_UL_HARQ_OKVALUES,2 } },     \
-  { .s5 = { NULL } },                                             \
-  { .s5 = { NULL } },                                             \
-  { .s5 = { NULL } },                                             \
-  { .s3a = { config_checkstr_assign_integer, \
-             {"ssb_rsrp", "ssb_sinr", "cri_rsrp"}, \
-             {SSB_RSRP, SSB_SINR, CRI_RSRP}, \
-             3 } }, \
-  { .s5 = { NULL } },                                             \
-  { .s5 = { NULL } },                                             \
+#define CELLPARAMS_CHECK {                                                     \
+  { .s2 = { config_check_intrange, TRACKING_AREA_CODE_OKRANGE } },            \
+  { .s5 = { NULL } },                                                          \
+  { .s5 = { NULL } },                                                          \
+  { .s5 = { NULL } },                                                          \
+  { .s5 = { NULL } },                                                          \
+  { .s5 = { NULL } },                                                          \
+  { .s5 = { NULL } },                                                          \
+  { .s3a = { config_checkstr_assign_integer,                                   \
+             {"none", "periodic", "aperiodic"},                                \
+             {NO_SRS, PERIODIC_SRS, APERIODIC_SRS},                            \
+             3 } },                                                            \
+  { .s5 = { NULL } },                                                          \
+  { .s5 = { NULL } },                                                          \
+  { .s5 = { NULL } },                                                          \
+  { .s5 = { NULL } },                                                          \
+  { .s5 = { NULL } },                                                          \
+  { .s5 = { NULL } },                                                          \
+  { .s5 = { NULL } },                                                          \
+  { .s5 = { NULL } },                                                          \
+  { .s5 = { NULL } },                                                          \
+  { .s5 = { NULL } },                                                          \
+  { .s1 = { config_check_intval, NUM_DL_HARQ_OKVALUES, 8 } },                 \
+  { .s1 = { config_check_intval, NUM_UL_HARQ_OKVALUES, 2 } },                 \
+  { .s5 = { NULL } },                                                          \
+  { .s5 = { NULL } },                                                          \
+  { .s5 = { NULL } },                                                          \
+  { .s3a = { config_checkstr_assign_integer,                                   \
+             {"ssb_rsrp", "ssb_sinr", "cri_rsrp"},                             \
+             {SSB_RSRP, SSB_SINR, CRI_RSRP},                                   \
+             3 } },                                                            \
+  { .s5 = { NULL } },                                                          \
+  { .s5 = { NULL } },                                                          \
+  { .s5 = { NULL } },                                                          \
+  { .s5 = { NULL } },                                                          \
+  { .s5 = { NULL } },                                                          \
+  { .s5 = { NULL } },                                                          \
+  { .s5 = { NULL } },                                                          \
+  { .s5 = { NULL } },                                                          \
+  { .s5 = { NULL } },                                                          \
+  { .s5 = { NULL } },                                                          \
+  { .s2 = { config_check_intrange, {0, 31} } },                               \
+  { .s2 = { config_check_intrange, {0, 31} } },                               \
+  { .s5 = { NULL } },                                                          \
+  { .s5 = { NULL } },                                                          \
+  { .s2 = { config_check_intrange, {0, 31} } },                               \
+  { .s2 = { config_check_intrange, {0, 31} } },                               \
+  { .s2 = { config_check_intrange, {1, 8} } },                                \
+  { .s2 = { config_check_intrange, {1, 8} } },                                \
+  { .s5 = { NULL } },                                                          \
+  { .s2 = { NULL } },                                                          \
+  { .s3a = { config_checkstr_assign_integer,                                   \
+             {"none", "preconfigured", "lophy"},                                \
+             {NO_BEAM_MODE, PRECONFIGURED_BEAM_IDX, LOPHY_BEAM_IDX},           \
+             3 } },                                                            \
+  { .s5 = { NULL } },                                                          \
+  { .s5 = { NULL } },                                                          \
+  { .s5 = { NULL } },                                                          \
+  { .s5 = { NULL } },                                                          \
+  { .s2 = { config_check_intrange, {-1280, 0} } },                            \
+  { .s2 = { config_check_intrange, {-1280, 0} } },                            \
+  { .s2 = { NULL } },                                                          \
 }
 
 /*-------------------------------------------------------------------------------------------------------------------------------------------------*/

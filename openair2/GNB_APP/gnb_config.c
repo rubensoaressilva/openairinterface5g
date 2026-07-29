@@ -611,26 +611,11 @@ void RCconfig_verify(configmodule_interface_t *cfg, ngran_node_t node_type)
   int num_gnbs = GNBSParams[GNB_ACTIVE_GNBS_IDX].numelt;
   AssertFatal(num_gnbs == 1, "need to have a " GNB_CONFIG_STRING_GNB_LIST " section, but %d found\n", num_gnbs);
   GET_PARAMS_LIST(GNBParamList, GNBParams, GNBPARAMS_DESC, GNB_CONFIG_STRING_GNB_LIST, NULL, GNBPARAMS_CHECK);
-  paramdef_t *gnbp = GNBParamList.paramarray[0];
 
   if (NODE_IS_CU(node_type)) {
     // verify that there is no SCC and radio config in the case of CU
     verify_section_notset(cfg, GNB_CONFIG_STRING_GNB_LIST ".[0]", GNB_CONFIG_STRING_SERVINGCELLCONFIGCOMMON);
-
-    verify_gnb_param_notset(gnbp, GNB_PDSCH_ANTENNAPORTS_N1_IDX, GNB_CONFIG_STRING_PDSCHANTENNAPORTS_N1);
-    verify_gnb_param_notset(gnbp, GNB_PDSCH_ANTENNAPORTS_N2_IDX, GNB_CONFIG_STRING_PDSCHANTENNAPORTS_N2);
-    verify_gnb_param_notset(gnbp, GNB_PDSCH_ANTENNAPORTS_XP_IDX, GNB_CONFIG_STRING_PDSCHANTENNAPORTS_XP);
-    verify_gnb_param_notset(gnbp, GNB_PUSCH_ANTENNAPORTS_IDX, GNB_CONFIG_STRING_PUSCHANTENNAPORTS);
-    verify_gnb_param_notset(gnbp, GNB_MINRXTXTIME_IDX, GNB_CONFIG_STRING_MINRXTXTIME);
-    verify_gnb_param_notset(gnbp, GNB_DO_TCI_IDX, GNB_CONFIG_STRING_DOTCI);
-    verify_gnb_param_notset(gnbp, GNB_DO_CSIRS_IDX, GNB_CONFIG_STRING_DOCSIRS);
-    verify_gnb_param_notset(gnbp, GNB_DO_SRS_IDX, GNB_CONFIG_STRING_DOSRS);
-    verify_gnb_param_notset(gnbp, GNB_FORCE256QAMOFF_IDX, GNB_CONFIG_STRING_FORCE256QAMOFF);
-    verify_gnb_param_notset(gnbp, GNB_MAXMIMOLAYERS_IDX, GNB_CONFIG_STRING_MAXMIMOLAYERS);
-    verify_gnb_param_notset(gnbp, GNB_DISABLE_HARQ_IDX, GNB_CONFIG_STRING_DISABLE_HARQ);
-    verify_gnb_param_notset(gnbp, GNB_NUM_DL_HARQ_IDX, GNB_CONFIG_STRING_NUM_DL_HARQPROCESSES);
-    verify_gnb_param_notset(gnbp, GNB_NUM_UL_HARQ_IDX, GNB_CONFIG_STRING_NUM_UL_HARQPROCESSES);
-    verify_gnb_param_notset(gnbp, GNB_CONFIG_REP_IDX, GNB_CONFIG_STRING_CONFIG_REP);
+    verify_section_notset(cfg, GNB_CONFIG_STRING_GNB_LIST ".[0]", GNB_CONFIG_STRING_CELLS_LIST);
 
     // check for some general sections
     verify_section_notset(cfg, NULL, CONFIG_STRING_L1_LIST);
@@ -639,7 +624,12 @@ void RCconfig_verify(configmodule_interface_t *cfg, ngran_node_t node_type)
     verify_section_notset(cfg, NULL, CONFIG_STRING_NR_RLC_LIST);
   } else if (NODE_IS_DU(node_type)) {
     // verify that there is no bearer config
-    verify_gnb_param_notset(gnbp, GNB_ENABLE_SDAP_IDX, GNB_CONFIG_STRING_ENABLE_SDAP);
+    char gnb0_path[MAX_OPTNAME_SIZE * 2 + 8];
+    snprintf(gnb0_path, sizeof(gnb0_path), "%s.[%i]", GNB_CONFIG_STRING_GNB_LIST, 0);
+    GET_PARAMS_LIST(CellParamList, CellParams, CELLPARAMS_DESC, GNB_CONFIG_STRING_CELLS_LIST, gnb0_path, CELLPARAMS_CHECK);
+    AssertFatal(CellParamList.numelt >= 1, "No cells configured in gNBs.[0].cells\n");
+    paramdef_t *cellp = CellParamList.paramarray[0];
+    verify_gnb_param_notset(cellp, CELL_ENABLE_SDAP_IDX, GNB_CONFIG_STRING_ENABLE_SDAP);
 
     verify_section_notset(cfg, GNB_CONFIG_STRING_GNB_LIST ".[0]", GNB_CONFIG_STRING_AMF_IP_ADDRESS);
     verify_section_notset(cfg, NULL, CONFIG_STRING_SECURITY);
@@ -741,15 +731,15 @@ void RCconfig_nr_prs(void)
 static int get_prb_blacklist(uint16_t *prbbl)
 {
   paramdef_t GNBSParams[] = GNBSPARAMS_DESC;
-  paramlist_def_t GNBParamList = {GNB_CONFIG_STRING_GNB_LIST, NULL, 0};
   config_get(config_get_if(), GNBSParams, sizeofArray(GNBSParams), NULL);
   int num_gnbs = GNBSParams[GNB_ACTIVE_GNBS_IDX].numelt;
   AssertFatal(num_gnbs > 0, "Failed to parse config file, no GNBs found in field %s \n", GNB_CONFIG_STRING_ACTIVE_GNBS);
-  paramdef_t GNBParams[] = GNBPARAMS_DESC;
-  config_getlist(config_get_if(), &GNBParamList, GNBParams, sizeofArray(GNBParams), NULL);
+  char gnb0_path[MAX_OPTNAME_SIZE * 2 + 8];
+  snprintf(gnb0_path, sizeof(gnb0_path), "%s.[%i]", GNB_CONFIG_STRING_GNB_LIST, 0);
+  GET_PARAMS_LIST(CellParamList, CellParams, CELLPARAMS_DESC, GNB_CONFIG_STRING_CELLS_LIST, gnb0_path, CELLPARAMS_CHECK);
 
   int num_prbbl = 0;
-  char *ulprbbl = *GNBParamList.paramarray[0][GNB_ULPRBBLACKLIST_IDX].strptr;
+  char *ulprbbl = *CellParamList.paramarray[0][CELL_ULPRBBLACKLIST_IDX].strptr;
 
   if (!ulprbbl)
     return -1;
@@ -771,9 +761,9 @@ static int get_prb_blacklist(uint16_t *prbbl)
 
 static void set_antenna_ports(paramlist_def_t *p, int *N1, int *N2, int *XP)
 {
-  *N1 = *p->paramarray[0][GNB_PDSCH_ANTENNAPORTS_N1_IDX].iptr;
-  *N2 = *p->paramarray[0][GNB_PDSCH_ANTENNAPORTS_N2_IDX].iptr;
-  *XP = *p->paramarray[0][GNB_PDSCH_ANTENNAPORTS_XP_IDX].iptr;
+  *N1 = *p->paramarray[0][CELL_PDSCH_ANTENNAPORTS_N1_IDX].iptr;
+  *N2 = *p->paramarray[0][CELL_PDSCH_ANTENNAPORTS_N2_IDX].iptr;
+  *XP = *p->paramarray[0][CELL_PDSCH_ANTENNAPORTS_XP_IDX].iptr;
 }
 
 void RCconfig_NR_L1(void)
@@ -788,7 +778,6 @@ void RCconfig_NR_L1(void)
       GET_PARAMS(GNBSParams, GNBSPARAMS_DESC, NULL);
       int num_gnbs = GNBSParams[GNB_ACTIVE_GNBS_IDX].numelt;
       AssertFatal(num_gnbs > 0, "Failed to parse config file, no GNBs found in field %s \n", GNB_CONFIG_STRING_ACTIVE_GNBS);
-      GET_PARAMS_LIST(GNBParamList, GNBParams, GNBPARAMS_DESC, GNB_CONFIG_STRING_GNB_LIST, NULL);
 
       // PRB Blacklist
       uint16_t prbbl[MAX_BWP_SIZE] = {0};
@@ -866,12 +855,26 @@ static NR_ServingCellConfigCommon_t *get_scc_config(int minRXTXTIME, int do_SRS)
   prepare_msgA_scc(scc);
 
   char aprefix[MAX_OPTNAME_SIZE*2 + 8];
-  snprintf(aprefix, sizeof(aprefix), "%s.[%i]", GNB_CONFIG_STRING_GNB_LIST, 0);
+  snprintf(aprefix,
+           sizeof(aprefix),
+           "%s.[%i].%s.[%i]",
+           GNB_CONFIG_STRING_GNB_LIST,
+           0,
+           GNB_CONFIG_STRING_CELLS_LIST,
+           0);
   GET_PARAMS_LIST(SCCsParamList, SCCsParams, SCCPARAMS_DESC(scc), GNB_CONFIG_STRING_SERVINGCELLCONFIGCOMMON, aprefix);
   GET_PARAMS_LIST(MsgASCCsParamList, MsgASCCsParams, MSGASCCPARAMS_DESC(scc), GNB_CONFIG_STRING_SERVINGCELLCONFIGCOMMON, aprefix);
 
   if (SCCsParamList.numelt > 0 || MsgASCCsParamList.numelt > 0) {
-    snprintf(aprefix, sizeof(aprefix), "%s.[%i].%s.[%i]", GNB_CONFIG_STRING_GNB_LIST, 0, GNB_CONFIG_STRING_SERVINGCELLCONFIGCOMMON, 0);
+    snprintf(aprefix,
+             sizeof(aprefix),
+             "%s.[%i].%s.[%i].%s.[%i]",
+             GNB_CONFIG_STRING_GNB_LIST,
+             0,
+             GNB_CONFIG_STRING_CELLS_LIST,
+             0,
+             GNB_CONFIG_STRING_SERVINGCELLCONFIGCOMMON,
+             0);
     GET_PARAMS(SCCsParams, SCCPARAMS_DESC(scc), aprefix);
     GET_PARAMS(MsgASCCsParams, MSGASCCPARAMS_DESC(scc), aprefix);
     // NR_TDD-UL-DL-ConfigCommon pattern2 (optional IE)
@@ -881,8 +884,10 @@ static NR_ServingCellConfigCommon_t *get_scc_config(int minRXTXTIME, int do_SRS)
     char aprefix[MAX_OPTNAME_SIZE * 2 + 8];
     snprintf(aprefix,
              sizeof(aprefix),
-             "%s.[%i].%s.[%i].%s",
+             "%s.[%i].%s.[%i].%s.[%i].%s",
              GNB_CONFIG_STRING_GNB_LIST,
+             0,
+             GNB_CONFIG_STRING_CELLS_LIST,
              0,
              GNB_CONFIG_STRING_SERVINGCELLCONFIGCOMMON,
              0,
@@ -991,18 +996,24 @@ static int read_du_cell_info(bool separate_du,
   }
 
   *name = strdup(*(GNBParamList.paramarray[0][GNB_GNB_NAME_IDX].strptr));
+
+  char gnb0_path[MAX_OPTNAME_SIZE * 2 + 8];
+  snprintf(gnb0_path, sizeof(gnb0_path), "%s.[%i]", GNB_CONFIG_STRING_GNB_LIST, 0);
+  GET_PARAMS_LIST(CellParamList, CellParams, CELLPARAMS_DESC, GNB_CONFIG_STRING_CELLS_LIST, gnb0_path, CELLPARAMS_CHECK);
+  AssertFatal(CellParamList.numelt >= 1, "No cells configured in gNBs.[0].cells\n");
+
   info->tac = malloc(sizeof(*info->tac));
   AssertFatal(info->tac != NULL, "out of memory\n");
-  *info->tac = *GNBParamList.paramarray[0][GNB_TRACKING_AREA_CODE_IDX].uptr;
+  *info->tac = *CellParamList.paramarray[0][CELL_TRACKING_AREA_CODE_IDX].uptr;
 
   // PLMN
   plmn_id_t p[PLMN_LIST_MAX_SIZE] = {0};
-  set_plmn_config(p, 0);
+  set_plmn_config(p, 0, 0);
   info->plmn = p[0];
-  info->nr_cellid = (uint64_t) * (GNBParamList.paramarray[0][GNB_NRCELLID_IDX].u64ptr);
+  info->nr_cellid = (uint64_t) * (CellParamList.paramarray[0][CELL_NRCELLID_IDX].u64ptr);
 
   // SNSSAI
-  info->num_ssi = set_snssai_config(info->nssai, MAX_NUM_SLICES, 0, 0);
+  info->num_ssi = set_snssai_config(info->nssai, MAX_NUM_SLICES, 0, 0, 0);
 
   return 1;
 }
@@ -1127,7 +1138,7 @@ static f1ap_setup_req_t *RC_read_F1Setup(uint64_t id,
 static nr_ptrs_config_t *get_ptrs_config()
 {
   char aprefix[MAX_OPTNAME_SIZE * 2 + 8];
-  snprintf(aprefix, sizeof(aprefix), "%s.[%i]", GNB_CONFIG_STRING_GNB_LIST, 0);
+  snprintf(aprefix, sizeof(aprefix), "%s.[%i].%s.[%i]", GNB_CONFIG_STRING_GNB_LIST, 0, GNB_CONFIG_STRING_CELLS_LIST, 0);
   GET_PARAMS_LIST(ptrs_ParamsList, ptrs_Params, GNB_PTRS_PARAMS_DESC, GNB_CONFIG_STRING_PTRS, aprefix);
   if (ptrs_ParamsList.numelt == 0) {
     LOG_I(GNB_APP, "No PTRS configuration found\n");
@@ -1171,7 +1182,14 @@ static nr_redcap_config_t *get_redcap_config(int gnb_idx)
 {
   paramdef_t RedCap_Params[] = GNB_REDCAP_PARAMS_DESC;
   char aprefix[MAX_OPTNAME_SIZE * 2 + 8];
-  snprintf(aprefix, sizeof(aprefix), "%s.[%d].%s", GNB_CONFIG_STRING_GNB_LIST, gnb_idx, GNB_CONFIG_STRING_REDCAP);
+  snprintf(aprefix,
+           sizeof(aprefix),
+           "%s.[%d].%s.[%i].%s",
+           GNB_CONFIG_STRING_GNB_LIST,
+           gnb_idx,
+           GNB_CONFIG_STRING_CELLS_LIST,
+           0,
+           GNB_CONFIG_STRING_REDCAP);
   int ret = config_get(config_get_if(), RedCap_Params, sizeofArray(RedCap_Params), aprefix);
 
   if (ret <= 0) {
@@ -1198,13 +1216,13 @@ static nr_redcap_config_t *get_redcap_config(int gnb_idx)
   return rc;
 }
 
-static seq_arr_t *fill_du_sibs(paramdef_t *GNBparamarray)
+static seq_arr_t *fill_du_sibs(paramdef_t *cellparamarray)
 {
   if (NODE_IS_DU(get_node_type()))
-    AssertFatal(GNBparamarray[GNB_CU_SIBS_IDX].numelt == 0, "This is DU, do not input CU SIBs\n");
+    AssertFatal(cellparamarray[CELL_CU_SIBS_IDX].numelt == 0, "This is DU, do not input CU SIBs\n");
 
   // TODO config_isparamset doesn't seem to work for array types, checking numelt instead
-  if (GNBparamarray[GNB_DU_SIBS_IDX].numelt == 0)
+  if (cellparamarray[CELL_DU_SIBS_IDX].numelt == 0)
     return NULL;
 
   if (!IS_SA_MODE(get_softmodem_params())) {
@@ -1214,8 +1232,8 @@ static seq_arr_t *fill_du_sibs(paramdef_t *GNBparamarray)
 
   seq_arr_t *du_SIBs = malloc(sizeof(seq_arr_t));
   seq_arr_init(du_SIBs, sizeof(nr_SIBs_t));
-  for (int i = 0; i < GNBparamarray[GNB_DU_SIBS_IDX].numelt; i++) {
-    int sib_value = GNBparamarray[GNB_DU_SIBS_IDX].iptr[i];
+  for (int i = 0; i < cellparamarray[CELL_DU_SIBS_IDX].numelt; i++) {
+    int sib_value = cellparamarray[CELL_DU_SIBS_IDX].iptr[i];
     // SIB10, SIB12, SIB13, SIB14, SIB15, SIB17, SIB18, SIB19 and SIB20 are generated by the DU
     // all the rest in the DU
     AssertFatal((sib_value > NR_SIB_9 && sib_value < NR_SIB_21) && sib_value != NR_SIB_11 && sib_value != NR_SIB_16,
@@ -1293,7 +1311,7 @@ void nfapi_stop_l1()
 static void get_bwp_config(nr_mac_config_t *configuration, const NR_ServingCellConfigCommon_t *scc)
 {
   char path[MAX_OPTNAME_SIZE * 2 + 8];
-  snprintf(path, sizeof(path), "%s.[%i]", GNB_CONFIG_STRING_GNB_LIST, 0);
+  snprintf(path, sizeof(path), "%s.[%i].%s.[%i]", GNB_CONFIG_STRING_GNB_LIST, 0, GNB_CONFIG_STRING_CELLS_LIST, 0);
   GET_PARAMS_LIST(BWPParamList, BWPParams, GNBBWPPARAMS_DESC, GNB_CONFIG_STRING_BWP_LIST, path, BWPPARAMS_CHECK);
   configuration->num_additional_bwps = BWPParamList.numelt;
   AssertFatal(configuration->num_additional_bwps >= 0 && configuration->num_additional_bwps <= 4,
@@ -1504,12 +1522,17 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
               GNB_CONFIG_STRING_ACTIVE_GNBS,
               num_gnbs);
 
+  char gnb0_path[MAX_OPTNAME_SIZE * 2 + 8];
+  snprintf(gnb0_path, sizeof(gnb0_path), "%s.[%i]", GNB_CONFIG_STRING_GNB_LIST, 0);
+  GET_PARAMS_LIST(CellParamList, CellParams, CELLPARAMS_DESC, GNB_CONFIG_STRING_CELLS_LIST, gnb0_path, CELLPARAMS_CHECK);
+  AssertFatal(CellParamList.numelt >= 1, "No cells configured in gNBs.[0].cells\n");
+
   // MAC / RLC
   GET_PARAMS_LIST(MacRLC_ParamList, MacRLC_Params, MACRLCPARAMS_DESC, MACRLC_LIST, NULL, MACRLCPARAMS_CHECK);
   nr_mac_config_t config = {0};
   nr_pdsch_AntennaPorts_t *p = &config.pdsch_AntennaPorts;
-  set_antenna_ports(&GNBParamList, &p->N1, &p->N2, &p->XP);
-  config.pusch_AntennaPorts = *GNBParamList.paramarray[0][GNB_PUSCH_ANTENNAPORTS_IDX].iptr;
+  set_antenna_ports(&CellParamList, &p->N1, &p->N2, &p->XP);
+  config.pusch_AntennaPorts = *CellParamList.paramarray[0][CELL_PUSCH_ANTENNAPORTS_IDX].iptr;
   LOG_I(GNB_APP,
         "pdsch_AntennaPorts N1 %d N2 %d XP %d pusch_AntennaPorts %d\n",
         config.pdsch_AntennaPorts.N1,
@@ -1520,11 +1543,7 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
   // RU
   GET_PARAMS_LIST(RUParamList, RUParams, RUPARAMS_DESC, CONFIG_STRING_RU_LIST, NULL);
   int num_tx = 0;
-  int beams_per_period;
-  if (MacRLC_ParamList.numelt > 0)
-    beams_per_period = *gpd(MacRLC_ParamList.paramarray[0], sizeofArray(MacRLC_Params), MACRLC_BEAMS_PERIOD)->u8ptr;
-  else
-    beams_per_period = 1;
+  int beams_per_period = *gpd(CellParamList.paramarray[0], sizeofArray(CellParams), MACRLC_BEAMS_PERIOD)->u8ptr;
   if (RUParamList.numelt > 0) {
     for (int i = 0; i < RUParamList.numelt; i++)
       num_tx += *(RUParamList.paramarray[i][RU_NB_TX_IDX].uptr);
@@ -1540,22 +1559,22 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
     num_tx = p->XP * p->N1 * p->N2 * beams_per_period;
     LOG_E(GNB_APP, "RU information not present in config file. Assuming physical antenna ports equal to logical antenna ports %d\n", num_tx);
   }
-  config.minRXTXTIME = *GNBParamList.paramarray[0][GNB_MINRXTXTIME_IDX].iptr;
+  config.minRXTXTIME = *CellParamList.paramarray[0][CELL_MINRXTXTIME_IDX].iptr;
   LOG_I(GNB_APP, "minTXRXTIME %d\n", config.minRXTXTIME);
-  config.do_TCI = *GNBParamList.paramarray[0][GNB_DO_TCI_IDX].iptr;
-  config.do_CSIRS = *GNBParamList.paramarray[0][GNB_DO_CSIRS_IDX].iptr;
-  const char *srs_type_s = *GNBParamList.paramarray[0][GNB_DO_SRS_IDX].strptr;
-  config.do_SRS = config_get_processedint(cfg, &GNBParamList.paramarray[0][GNB_DO_SRS_IDX]);
-  config.max_num_rsrp = *GNBParamList.paramarray[0][GNB_LIMIT_RSRP_REPORT_IDX].iptr;
-  const char *report_type_s = *GNBParamList.paramarray[0][GNB_CONFIG_REP_IDX].strptr;
-  config.report_type = config_get_processedint(cfg, &GNBParamList.paramarray[0][GNB_CONFIG_REP_IDX]);
-  config.force_256qam_off = *GNBParamList.paramarray[0][GNB_FORCE256QAMOFF_IDX].iptr;
-  config.force_UL256qam_off = *GNBParamList.paramarray[0][GNB_FORCEUL256QAMOFF_IDX].iptr;
-  config.use_deltaMCS = *GNBParamList.paramarray[0][GNB_USE_DELTA_MCS_IDX].iptr != 0;
-  config.maxMIMO_layers = *GNBParamList.paramarray[0][GNB_MAXMIMOLAYERS_IDX].iptr;
-  config.disable_harq = *GNBParamList.paramarray[0][GNB_DISABLE_HARQ_IDX].iptr;
-  config.num_dlharq = *GNBParamList.paramarray[0][GNB_NUM_DL_HARQ_IDX].iptr;
-  config.num_ulharq =  *GNBParamList.paramarray[0][GNB_NUM_UL_HARQ_IDX].iptr;
+  config.do_TCI = *CellParamList.paramarray[0][CELL_DO_TCI_IDX].iptr;
+  config.do_CSIRS = *CellParamList.paramarray[0][CELL_DO_CSIRS_IDX].iptr;
+  const char *srs_type_s = *CellParamList.paramarray[0][CELL_DO_SRS_IDX].strptr;
+  config.do_SRS = config_get_processedint(cfg, &CellParamList.paramarray[0][CELL_DO_SRS_IDX]);
+  config.max_num_rsrp = *CellParamList.paramarray[0][CELL_LIMIT_RSRP_REPORT_IDX].iptr;
+  const char *report_type_s = *CellParamList.paramarray[0][CELL_CONFIG_REP_IDX].strptr;
+  config.report_type = config_get_processedint(cfg, &CellParamList.paramarray[0][CELL_CONFIG_REP_IDX]);
+  config.force_256qam_off = *CellParamList.paramarray[0][CELL_FORCE256QAMOFF_IDX].iptr;
+  config.force_UL256qam_off = *CellParamList.paramarray[0][CELL_FORCEUL256QAMOFF_IDX].iptr;
+  config.use_deltaMCS = *CellParamList.paramarray[0][CELL_USE_DELTA_MCS_IDX].iptr != 0;
+  config.maxMIMO_layers = *CellParamList.paramarray[0][CELL_MAXMIMOLAYERS_IDX].iptr;
+  config.disable_harq = *CellParamList.paramarray[0][CELL_DISABLE_HARQ_IDX].iptr;
+  config.num_dlharq = *CellParamList.paramarray[0][CELL_NUM_DL_HARQ_IDX].iptr;
+  config.num_ulharq = *CellParamList.paramarray[0][CELL_NUM_UL_HARQ_IDX].iptr;
   if (config.disable_harq)
     LOG_W(GNB_APP, "\"disable_harq\" is a REL17 feature and is incompatible with REL15 and REL16 UEs!\n");
   LOG_I(GNB_APP,
@@ -1613,9 +1632,9 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
   uess_num_agg_level_candidates[PDCCH_AGG_LEVEL16] = NR_SearchSpace__nrofCandidates__aggregationLevel16_n0;
   int* agg_level_list = uess_num_agg_level_candidates;
   int num_agg_levels = 5;
-  if (GNBParamList.paramarray[0][GNB_UESS_AGG_LEVEL_LIST_IDX].numelt > 0) {
-    agg_level_list = GNBParamList.paramarray[0][GNB_UESS_AGG_LEVEL_LIST_IDX].iptr;
-    num_agg_levels = GNBParamList.paramarray[0][GNB_UESS_AGG_LEVEL_LIST_IDX].numelt;
+  if (CellParamList.paramarray[0][CELL_UESS_AGG_LEVEL_LIST_IDX].numelt > 0) {
+    agg_level_list = CellParamList.paramarray[0][CELL_UESS_AGG_LEVEL_LIST_IDX].iptr;
+    num_agg_levels = CellParamList.paramarray[0][CELL_UESS_AGG_LEVEL_LIST_IDX].numelt;
   }
   memcpy(config.num_agg_level_candidates, agg_level_list, sizeof(int) * num_agg_levels);
   LOG_I(NR_MAC,
@@ -1630,7 +1649,7 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
   // BWP
   get_bwp_config(&config, scc);
   AssertFatal(config.num_additional_bwps <= 4, "Impossible to configure more than 4 additional BWPs\n");
-  config.first_active_bwp = *GNBParamList.paramarray[0][GNB_1ST_ACTIVE_BWP_IDX].iptr;
+  config.first_active_bwp = *CellParamList.paramarray[0][CELL_1ST_ACTIVE_BWP_IDX].iptr;
   AssertFatal(config.first_active_bwp <= config.num_additional_bwps, "1st active BWP does not belog to the configured BWPs\n");
 
   if (MacRLC_ParamList.numelt > 0) {
@@ -1640,15 +1659,15 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
     nr_rlc_configuration_t default_rlc_config;
     config_rlc(cfg, &default_rlc_config);
 
-    const paramdef_t *params = MacRLC_ParamList.paramarray[0];
-    const int np = sizeofArray(MacRLC_Params);
-    config.pusch.target_snrx10 = *gpd(params, np, MACRLC_PUSCHTARGETSNRX10)->iptr;
-    config.pusch.rssi_threshold = *gpd(params, np, MACRLC_PUSCH_RSSI_THRESHOLD)->iptr;
-    config.pucch.rssi_threshold = *gpd(params, np, MACRLC_PUCCH_RSSI_THRESHOLD)->iptr;
-    config.pucch.target_snrx10 = *gpd(params, np, MACRLC_PUCCHTARGETSNRX10)->iptr;
-    config.ul_prbblack_SNR_threshold = *gpd(params, np, MACRLC_UL_PRBBLACK_SNR_THRESHOLD)->iptr;
-    config.pucch.failure_thres = *gpd(params, np, MACRLC_PUCCHFAILURETHRES)->iptr;
-    config.pusch.failure_thres = *gpd(params, np, MACRLC_PUSCHFAILURETHRES)->iptr;
+    const paramdef_t *cell_params = CellParamList.paramarray[0];
+    const int cell_np = sizeofArray(CellParams);
+    config.pusch.target_snrx10 = *gpd(cell_params, cell_np, MACRLC_PUSCHTARGETSNRX10)->iptr;
+    config.pusch.rssi_threshold = *gpd(cell_params, cell_np, MACRLC_PUSCH_RSSI_THRESHOLD)->iptr;
+    config.pucch.rssi_threshold = *gpd(cell_params, cell_np, MACRLC_PUCCH_RSSI_THRESHOLD)->iptr;
+    config.pucch.target_snrx10 = *gpd(cell_params, cell_np, MACRLC_PUCCHTARGETSNRX10)->iptr;
+    config.ul_prbblack_SNR_threshold = *gpd(cell_params, cell_np, MACRLC_UL_PRBBLACK_SNR_THRESHOLD)->iptr;
+    config.pucch.failure_thres = *gpd(cell_params, cell_np, MACRLC_PUCCHFAILURETHRES)->iptr;
+    config.pusch.failure_thres = *gpd(cell_params, cell_np, MACRLC_PUSCHFAILURETHRES)->iptr;
 
     LOG_I(NR_MAC,
           "PUSCH Target %d RSSI thresh %d Failure %d, PUCCH Target %d RSSI thresh %d Failure %d\n",
@@ -1666,7 +1685,8 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
 
     for (j = 0; j < RC.nb_nr_macrlc_inst; j++) {
       gNB_MAC_INST *nrmac = RC.nrmac[j];
-      params = MacRLC_ParamList.paramarray[j]; // RC.nb_nr_macrlc_inst == 1 as per assert, but keep consistent
+      const paramdef_t *params = MacRLC_ParamList.paramarray[j]; // RC.nb_nr_macrlc_inst == 1 as per assert, but keep consistent
+      const int np = sizeofArray(MacRLC_Params);
       if (strcmp(*gpd(params, np, MACRLC_TRANSPORT_N_PREFERENCE)->strptr, "local_RRC") == 0) {
         // check number of instances is same as RRC/PDCP
 
@@ -1714,28 +1734,28 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
       } else { // other midhaul
         AssertFatal(1 == 0, "MACRLC %d: %s unknown southbound midhaul\n", j, *gpd(params, np, MACRLC_TRANSPORT_S_PREFERENCE)->strptr);
       }
-      cell->ulsch_max_frame_inactivity = *gpd(params, np, MACRLC_ULSCH_MAX_FRAME_INACTIVITY)->uptr;
+      cell->ulsch_max_frame_inactivity = *gpd(cell_params, cell_np, MACRLC_ULSCH_MAX_FRAME_INACTIVITY)->uptr;
       nrmac->stats_max_ue = *gpd(params, np, MACRLC_STATS_MAX_UE)->iptr;
       nrmac->print_ue_stats = nrmac->stats_max_ue > 0;
       NR_bler_options_t *dl_bler_options = &cell->dl_bler;
-      dl_bler_options->upper = *gpd(params, np, MACRLC_DL_BLER_TARGET_UPPER)->dblptr;
-      dl_bler_options->lower = *gpd(params, np, MACRLC_DL_BLER_TARGET_LOWER)->dblptr;
-      dl_bler_options->min_mcs = *gpd(params, np, MACRLC_DL_MIN_MCS)->u8ptr;
-      dl_bler_options->max_mcs = *gpd(params, np, MACRLC_DL_MAX_MCS)->u8ptr;
+      dl_bler_options->upper = *gpd(cell_params, cell_np, MACRLC_DL_BLER_TARGET_UPPER)->dblptr;
+      dl_bler_options->lower = *gpd(cell_params, cell_np, MACRLC_DL_BLER_TARGET_LOWER)->dblptr;
+      dl_bler_options->min_mcs = *gpd(cell_params, cell_np, MACRLC_DL_MIN_MCS)->u8ptr;
+      dl_bler_options->max_mcs = *gpd(cell_params, cell_np, MACRLC_DL_MAX_MCS)->u8ptr;
       if (config.disable_harq)
         dl_bler_options->harq_round_max = 1;
       else
-        dl_bler_options->harq_round_max = *gpd(params, np, MACRLC_DL_HARQ_ROUND_MAX)->u8ptr;
+        dl_bler_options->harq_round_max = *gpd(cell_params, cell_np, MACRLC_DL_HARQ_ROUND_MAX)->u8ptr;
       NR_bler_options_t *ul_bler_options = &cell->ul_bler;
-      ul_bler_options->upper = *gpd(params, np, MACRLC_UL_BLER_TARGET_UPPER)->dblptr;
-      ul_bler_options->lower = *gpd(params, np, MACRLC_UL_BLER_TARGET_LOWER)->dblptr;
-      ul_bler_options->min_mcs = *gpd(params, np, MACRLC_UL_MIN_MCS)->u8ptr;
-      ul_bler_options->max_mcs = *gpd(params, np, MACRLC_UL_MAX_MCS)->u8ptr;
+      ul_bler_options->upper = *gpd(cell_params, cell_np, MACRLC_UL_BLER_TARGET_UPPER)->dblptr;
+      ul_bler_options->lower = *gpd(cell_params, cell_np, MACRLC_UL_BLER_TARGET_LOWER)->dblptr;
+      ul_bler_options->min_mcs = *gpd(cell_params, cell_np, MACRLC_UL_MIN_MCS)->u8ptr;
+      ul_bler_options->max_mcs = *gpd(cell_params, cell_np, MACRLC_UL_MAX_MCS)->u8ptr;
       if (config.disable_harq)
         ul_bler_options->harq_round_max = 1;
       else
-        ul_bler_options->harq_round_max = *gpd(params, np, MACRLC_UL_HARQ_ROUND_MAX)->u8ptr;
-      cell->min_grant_prb = *gpd(params, np, MACRLC_MIN_GRANT_PRB)->u16ptr;
+        ul_bler_options->harq_round_max = *gpd(cell_params, cell_np, MACRLC_UL_HARQ_ROUND_MAX)->u8ptr;
+      cell->min_grant_prb = *gpd(cell_params, cell_np, MACRLC_MIN_GRANT_PRB)->u16ptr;
       long sc_fdma = NR_PUSCH_Config__transformPrecoder_enabled;
       NR_BWP_UplinkCommon_t *bwp = cell->common_channels.ServingCellConfigCommon->uplinkConfigCommon->initialUplinkBWP;
       if (bwp->rach_ConfigCommon->choice.setup->msg3_transformPrecoder != NULL)
@@ -1751,7 +1771,7 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
               new_min);
        cell->min_grant_prb = new_min;
       }
-      cell->identity_pm = *gpd(params, np, MACRLC_IDENTITY_PM)->u8ptr;
+      cell->identity_pm = *gpd(cell_params, cell_np, MACRLC_IDENTITY_PM)->u8ptr;
       // PRB Blacklist
       uint16_t prbbl[MAX_BWP_SIZE] = {0};
       int num_ulprbbl = get_prb_blacklist(prbbl);
@@ -1760,7 +1780,7 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
         memcpy(cell->ulprbbl, prbbl, MAX_BWP_SIZE * sizeof(prbbl[0]));
       }
       // config_get_processedint() takes only paramdef_t *, so cast const away
-      paramdef_t *p_ab = (paramdef_t *)gpd(params, np, MACRLC_ANALOG_BEAMFORMING);
+      paramdef_t *p_ab = (paramdef_t *)gpd(cell_params, cell_np, MACRLC_ANALOG_BEAMFORMING);
       NR_beam_info_t *beam_info = &cell->beam_info;
       beam_info->beam_mode = config_get_processedint(cfg, p_ab);
       beam_info->beams_per_period = beams_per_period;
@@ -1768,7 +1788,7 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
         if (cell->beam_info.beam_mode == PRECONFIGURED_BEAM_IDX)
           AssertFatal(NFAPI_MODE == NFAPI_MONOLITHIC, "Analog beamforming only supported for monolithic scenario\n");
         beam_info->beam_allocation = malloc16(beams_per_period * sizeof(beam_info->beam_allocation));
-        beam_info->beam_duration = *gpd(params, np, MACRLC_BEAM_DURATION)->u8ptr;
+        beam_info->beam_duration = *gpd(cell_params, cell_np, MACRLC_BEAM_DURATION)->u8ptr;
         beam_info->beam_allocation_size = -1; // to be initialized once we have information on frame configuration
       }
       bool das_enabled = false;
@@ -1779,7 +1799,7 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
         das_enabled =  *gpd(l1_params, l1_np, L1_ANALOG_DAS)->uptr;
       }
       // TODO config_isparamset doesn't seem to work for array types, checking numelt instead
-      int n = gpd(params, np, MACRLC_BEAM_WEIGHTS_LIST)->numelt;
+      int n = gpd(cell_params, cell_np, MACRLC_BEAM_WEIGHTS_LIST)->numelt;
       if (n > 0) {
         AssertFatal(!das_enabled, "No need to set beam weights in case of DAS\n");
         int num_beam = n;
@@ -1794,9 +1814,9 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
         config.nb_bfw[1] = num_beam; // number of beams weights/indices
         config.bw_list = calloc_or_fail(n, sizeof(*config.bw_list));
         for (int b = 0; b < n; b++)
-          config.bw_list[b] = gpd(params, np, MACRLC_BEAM_WEIGHTS_LIST)->iptr[b];
+          config.bw_list[b] = gpd(cell_params, cell_np, MACRLC_BEAM_WEIGHTS_LIST)->iptr[b];
       } else if (das_enabled) {
-        n = *gpd(params, np, MACRLC_BEAMS_PERIOD)->u8ptr;
+        n = *gpd(cell_params, cell_np, MACRLC_BEAMS_PERIOD)->u8ptr;
         config.nb_bfw[0] = num_tx;  // number of tx antennas
         config.nb_bfw[1] = n; // number of beams weights/indices
         config.bw_list = calloc_or_fail(n, sizeof(*config.bw_list));
@@ -1807,20 +1827,20 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
       config.bt.num_weights_per_beam = 0;
       config.bt.beam_ids = NULL;
       config.bt.beam_weights = NULL;
-      char **fptr = gpd(params, np, MACRLC_DBT_FILE)->strptr;
+      char **fptr = gpd(cell_params, cell_np, MACRLC_DBT_FILE)->strptr;
       if (fptr && *fptr && **fptr != '\0') {
         LOG_I(GNB_APP, "loading DBT table from file %s\n", *fptr);
         config.bt.beam_weights =
             read_dbt_from_csv(*fptr, &config.bt.num_beams, &config.bt.num_weights_per_beam, &config.bt.beam_ids);
       } else {
         char prefix[MAX_OPTNAME_SIZE * 2 + 8];
-        snprintf(prefix, sizeof(prefix), MACRLC_LIST ".[%d]", j);
+        snprintf(prefix, sizeof(prefix), "%s.[0].%s.[0]", GNB_CONFIG_STRING_GNB_LIST, GNB_CONFIG_STRING_CELLS_LIST);
         config.bt.beam_weights =
             read_dbt_from_config(prefix, &config.bt.num_beams, &config.bt.num_weights_per_beam, &config.bt.beam_ids);
       }
 
       // Read spatial stream indices
-      config_spatial_stream_index(params, np, &cell->radio_config, num_tx);
+      config_spatial_stream_index(cell_params, cell_np, &cell->radio_config, num_tx);
 
       // triggers also PHY initialization in case we have L1 via FAPI
       nr_mac_config_scc(nrmac, cell, scc, &config);
@@ -1836,7 +1856,7 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
     cell->plmn = info.plmn;
     gNB_MAC_INST *nrmac = RC.nrmac[0];
     NR_COMMON_channels_t *cc = &cell->common_channels;
-    cc->du_SIBs = fill_du_sibs(GNBParamList.paramarray[0]);
+    cc->du_SIBs = fill_du_sibs(CellParamList.paramarray[0]);
 
     if (IS_SA_MODE(get_softmodem_params()))
       nr_mac_configure_sib1(cell, &info.plmn, info.nr_cellid, *info.tac);
@@ -1991,13 +2011,13 @@ static int sort_neighbour_cell_config_by_cell_id(const void *a, const void *b)
   return 0;
 }
 
-static seq_arr_t *fill_cu_sibs(paramdef_t *GNBparamarray)
+static seq_arr_t *fill_cu_sibs(paramdef_t *cellparamarray)
 {
   if (NODE_IS_CU(get_node_type()))
-    AssertFatal(GNBparamarray[GNB_DU_SIBS_IDX].numelt == 0, "This is CU, do not input DU SIBs\n");
+    AssertFatal(cellparamarray[CELL_DU_SIBS_IDX].numelt == 0, "This is CU, do not input DU SIBs\n");
 
   // TODO config_isparamset doesn't seem to work for array types, checking numelt instead
-  if (GNBparamarray[GNB_CU_SIBS_IDX].numelt == 0)
+  if (cellparamarray[CELL_CU_SIBS_IDX].numelt == 0)
     return NULL;
 
   if (!IS_SA_MODE(get_softmodem_params())) {
@@ -2007,8 +2027,8 @@ static seq_arr_t *fill_cu_sibs(paramdef_t *GNBparamarray)
 
   seq_arr_t *SIBs = malloc(sizeof(seq_arr_t));
   seq_arr_init(SIBs, sizeof(nr_SIBs_t));
-  for (int i = 0; i < GNBparamarray[GNB_CU_SIBS_IDX].numelt; i++) {
-    int sib_value = GNBparamarray[GNB_CU_SIBS_IDX].iptr[i];
+  for (int i = 0; i < cellparamarray[CELL_CU_SIBS_IDX].numelt; i++) {
+    int sib_value = cellparamarray[CELL_CU_SIBS_IDX].iptr[i];
     // SIB10, SIB12, SIB13, SIB14, SIB15, SIB17, SIB18, SIB19 and SIB20 are generated by the DU
     // all the rest in the CU
     AssertFatal((sib_value > 1 && sib_value < 10) || sib_value == 11 || sib_value == 16,
@@ -2315,7 +2335,14 @@ static sib2_config_t fill_sib2_configuration(uint8_t gnb_idx)
   sib2_config_t sib2 = {0};
 
   char sib2_path[MAX_OPTNAME_SIZE * 2 + 8];
-  snprintf(sib2_path, sizeof(sib2_path), "%s.[%i].%s", GNB_CONFIG_STRING_GNB_LIST, gnb_idx, GNB_CONFIG_STRING_SIB2_CONFIG);
+  snprintf(sib2_path,
+           sizeof(sib2_path),
+           "%s.[%i].%s.[%i].%s",
+           GNB_CONFIG_STRING_GNB_LIST,
+           gnb_idx,
+           GNB_CONFIG_STRING_CELLS_LIST,
+           0,
+           GNB_CONFIG_STRING_SIB2_CONFIG);
 
   GET_PARAMS(SIB2Params, GNBSIB2PARAMS_DESC, sib2_path);
   const int n_sib2_params = sizeofArray(SIB2Params);
@@ -2386,6 +2413,10 @@ gNB_RRC_INST *RCconfig_NRRRC()
 
   if (num_gnbs > 0) {
     GET_PARAMS_LIST(GNBParamList, GNBParams, GNBPARAMS_DESC, GNB_CONFIG_STRING_GNB_LIST, NULL);
+    char gnb0_path[MAX_OPTNAME_SIZE * 2 + 8];
+    snprintf(gnb0_path, sizeof(gnb0_path), "%s.[%i]", GNB_CONFIG_STRING_GNB_LIST, i);
+    GET_PARAMS_LIST(CellParamList, CellParams, CELLPARAMS_DESC, GNB_CONFIG_STRING_CELLS_LIST, gnb0_path, CELLPARAMS_CHECK);
+    AssertFatal(CellParamList.numelt >= 1, "No cells configured in gNBs.[0].cells\n");
     if (GNBParamList.paramarray[i][GNB_GNB_ID_IDX].uptr == NULL) {
     // Calculate a default gNB ID
       if (IS_SA_MODE(get_softmodem_params())) {
@@ -2434,9 +2465,9 @@ gNB_RRC_INST *RCconfig_NRRRC()
 
         fill_measurement_configuration(k, rrc);
 
-        rrc->SIBs = fill_cu_sibs(GNBParamList.paramarray[i]);
+        rrc->SIBs = fill_cu_sibs(CellParamList.paramarray[0]);
 
-        nrrrc_config.tac               = *GNBParamList.paramarray[i][GNB_TRACKING_AREA_CODE_IDX].uptr;
+        nrrrc_config.tac               = *CellParamList.paramarray[0][CELL_TRACKING_AREA_CODE_IDX].uptr;
         AssertFatal(!GNBParamList.paramarray[i][GNB_MOBILE_COUNTRY_CODE_IDX_OLD].strptr
                     && !GNBParamList.paramarray[i][GNB_MOBILE_NETWORK_CODE_IDX_OLD].strptr,
                     "It seems that you use an old configuration file. Please change the existing\n"
@@ -2447,10 +2478,10 @@ gNB_RRC_INST *RCconfig_NRRRC()
                     "    tracking_area_code  =  1; // no string!!\n"
                     "    plmn_list = ( { mcc = 208; mnc = 93; mnc_length = 2; } )\n");
 
-        nrrrc_config.num_plmn = set_plmn_config(nrrrc_config.plmn, k);
-        nrrrc_config.enable_sdap = *GNBParamList.paramarray[i][GNB_ENABLE_SDAP_IDX].iptr;
+        nrrrc_config.num_plmn = set_plmn_config(nrrrc_config.plmn, k, 0);
+        nrrrc_config.enable_sdap = *CellParamList.paramarray[0][CELL_ENABLE_SDAP_IDX].iptr;
         LOG_I(GNB_APP, "SDAP UL/DL headers in RRC are %s\n", nrrrc_config.enable_sdap ? "present" : "absent");
-        nrrrc_config.um_on_default_drb = *(GNBParamList.paramarray[i][GNB_UMONDEFAULTDRB_IDX].uptr);
+        nrrrc_config.um_on_default_drb = *(CellParamList.paramarray[0][CELL_UMONDEFAULTDRB_IDX].uptr);
 
       }//
     }//End for (k=0; k <num_gnbs ; k++)
@@ -2591,11 +2622,17 @@ int RCconfig_NR_X2(MessageDef *msg_p, uint32_t i) {
             }
 
             X2AP_REGISTER_ENB_REQ (msg_p).eNB_name         = strdup(*(GNBParamList.paramarray[k][GNB_GNB_NAME_IDX].strptr));
-            X2AP_REGISTER_ENB_REQ (msg_p).tac              = *GNBParamList.paramarray[k][GNB_TRACKING_AREA_CODE_IDX].uptr;
+            {
+              char gnbk_path[MAX_OPTNAME_SIZE * 2 + 8];
+              snprintf(gnbk_path, sizeof(gnbk_path), "%s.[%i]", GNB_CONFIG_STRING_GNB_LIST, k);
+              GET_PARAMS_LIST(CellParamList_x2, CellParams_x2, CELLPARAMS_DESC, GNB_CONFIG_STRING_CELLS_LIST, gnbk_path);
+              AssertFatal(CellParamList_x2.numelt >= 1, "No cells configured in gNBs.[%d].cells\n", k);
+              X2AP_REGISTER_ENB_REQ(msg_p).tac = *CellParamList_x2.paramarray[0][CELL_TRACKING_AREA_CODE_IDX].uptr;
+            }
 
             // PLMN
             plmn_id_t p[PLMN_LIST_MAX_SIZE];
-            uint8_t num_plmn = set_plmn_config(p, k);
+            uint8_t num_plmn = set_plmn_config(p, k, 0);
             if (num_plmn > 1)
               LOG_W(X2AP, "X2AP currently handles only one PLMN, ignoring the others!\n");
             X2AP_REGISTER_ENB_REQ(msg_p).mcc = p[0].mcc;
@@ -2607,10 +2644,18 @@ int RCconfig_NR_X2(MessageDef *msg_p, uint32_t i) {
                         X2AP_REGISTER_ENB_REQ(msg_p).mnc);
 
             char aprefix[MAX_OPTNAME_SIZE * 80 + 8];
-            snprintf(aprefix, sizeof(aprefix), "%s.[%i]", GNB_CONFIG_STRING_GNB_LIST, 0);
+            snprintf(aprefix, sizeof(aprefix), "%s.[%i].%s.[%i]", GNB_CONFIG_STRING_GNB_LIST, 0, GNB_CONFIG_STRING_CELLS_LIST, 0);
             GET_PARAMS_LIST(SCCsParamList, SCCsParams, SCCPARAMS_DESC(scc), GNB_CONFIG_STRING_SERVINGCELLCONFIGCOMMON, aprefix);
             if (SCCsParamList.numelt > 0) {
-              snprintf(aprefix, sizeof(aprefix), "%s.[%i].%s.[%i]", GNB_CONFIG_STRING_GNB_LIST, 0, GNB_CONFIG_STRING_SERVINGCELLCONFIGCOMMON, 0);
+              snprintf(aprefix,
+                       sizeof(aprefix),
+                       "%s.[%i].%s.[%i].%s.[%i]",
+                       GNB_CONFIG_STRING_GNB_LIST,
+                       0,
+                       GNB_CONFIG_STRING_CELLS_LIST,
+                       0,
+                       GNB_CONFIG_STRING_SERVINGCELLCONFIGCOMMON,
+                       0);
               GET_PARAMS(SCCsParams, SCCPARAMS_DESC(scc), aprefix);
               fix_scc(scc,ssb_bitmap);
             }

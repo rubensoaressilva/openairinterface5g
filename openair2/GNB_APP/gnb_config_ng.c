@@ -68,7 +68,11 @@ int RCconfig_NR_NG(MessageDef *msg_p, uint32_t i)
             }
 
             NGAP_REGISTER_GNB_REQ(msg_p).gNB_name = strdup(*(GNBParamList.paramarray[k][GNB_GNB_NAME_IDX].strptr));
-            NGAP_REGISTER_GNB_REQ(msg_p).tac = *GNBParamList.paramarray[k][GNB_TRACKING_AREA_CODE_IDX].uptr;
+            char gnbk_path[MAX_OPTNAME_SIZE * 2 + 8];
+            snprintf(gnbk_path, sizeof(gnbk_path), "%s.[%i]", GNB_CONFIG_STRING_GNB_LIST, k);
+            GET_PARAMS_LIST(CellParamList, CellParams, CELLPARAMS_DESC, GNB_CONFIG_STRING_CELLS_LIST, gnbk_path);
+            AssertFatal(CellParamList.numelt >= 1, "No cells configured in gNBs.[%d].cells\n", k);
+            NGAP_REGISTER_GNB_REQ(msg_p).tac = *CellParamList.paramarray[0][CELL_TRACKING_AREA_CODE_IDX].uptr;
             AssertFatal(!GNBParamList.paramarray[k][GNB_MOBILE_COUNTRY_CODE_IDX_OLD].strptr
                             && !GNBParamList.paramarray[k][GNB_MOBILE_NETWORK_CODE_IDX_OLD].strptr,
                         "It seems that you use an old configuration file. Please change the existing\n"
@@ -80,12 +84,12 @@ int RCconfig_NR_NG(MessageDef *msg_p, uint32_t i)
                         "    plmn_list = ( { mcc = 208; mnc = 93; mnc_length = 2; } )\n");
             // PLMN
             plmn_id_t p[PLMN_LIST_MAX_SIZE] = {0};
-            NGAP_REGISTER_GNB_REQ(msg_p).num_plmn = set_plmn_config(p, 0);
+            NGAP_REGISTER_GNB_REQ(msg_p).num_plmn = set_plmn_config(p, k, 0);
             for (int l = 0; l < NGAP_REGISTER_GNB_REQ(msg_p).num_plmn; ++l) {
               NGAP_REGISTER_GNB_REQ(msg_p).plmn[l].plmn = p[l];
               // SNSSAI
               NGAP_REGISTER_GNB_REQ(msg_p).plmn[l].num_nssai =
-                  set_snssai_config(NGAP_REGISTER_GNB_REQ(msg_p).plmn[l].s_nssai, 8, k, l);
+                  set_snssai_config(NGAP_REGISTER_GNB_REQ(msg_p).plmn[l].s_nssai, 8, k, 0, l);
             }
             NGAP_REGISTER_GNB_REQ(msg_p).default_drx = 0;
             // NG

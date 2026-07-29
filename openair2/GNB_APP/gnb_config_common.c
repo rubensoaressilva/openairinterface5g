@@ -9,10 +9,18 @@
 #include "gnb_paramdef.h"
 #include "sctp_default_values.h"
 
-uint16_t set_snssai_config(nssai_t *nssai, const int max_num_ssi, uint8_t k, uint8_t l)
+uint16_t set_snssai_config(nssai_t *nssai, const int max_num_ssi, uint8_t gnb_idx, uint8_t cell_idx, uint8_t plmn_idx)
 {
   char snssaistr[MAX_OPTNAME_SIZE * 2 + 8];
-  snprintf(snssaistr, sizeof(snssaistr), "%s.[%i].%s.[%i]", GNB_CONFIG_STRING_GNB_LIST, k, GNB_CONFIG_STRING_PLMN_LIST, l);
+  snprintf(snssaistr,
+           sizeof(snssaistr),
+           "%s.[%i].%s.[%i].%s.[%i]",
+           GNB_CONFIG_STRING_GNB_LIST,
+           gnb_idx,
+           GNB_CONFIG_STRING_CELLS_LIST,
+           cell_idx,
+           GNB_CONFIG_STRING_PLMN_LIST,
+           plmn_idx);
   GET_PARAMS_LIST(SNSSAIParamList,
                   SNSSAIParams,
                   GNBSNSSAIPARAMS_DESC,
@@ -43,10 +51,10 @@ plmn_id_t extract_plmn_from_params(const paramdef_t *params, int n_params)
   return plmn;
 }
 
-uint8_t set_plmn_config(plmn_id_t *p, uint8_t idx)
+uint8_t set_plmn_config(plmn_id_t *p, uint8_t gnb_idx, uint8_t cell_idx)
 {
   char gnbpath[MAX_OPTNAME_SIZE * 2 + 8];
-  snprintf(gnbpath, sizeof(gnbpath), "%s.[%i]", GNB_CONFIG_STRING_GNB_LIST, idx);
+  snprintf(gnbpath, sizeof(gnbpath), "%s.[%i].%s.[%i]", GNB_CONFIG_STRING_GNB_LIST, gnb_idx, GNB_CONFIG_STRING_CELLS_LIST, cell_idx);
   GET_PARAMS_LIST(PLMNParamList, PLMNParams, GNBPLMNPARAMS_DESC, GNB_CONFIG_STRING_PLMN_LIST, gnbpath, PLMNPARAMS_CHECK);
   uint8_t num_plmn = PLMNParamList.numelt;
   const int n_plmn_params = sizeofArray(PLMNParams);
