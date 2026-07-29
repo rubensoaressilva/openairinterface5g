@@ -1691,11 +1691,6 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
       AssertFatal(config.first_active_bwp <= config.num_additional_bwps, "1st active BWP does not belong to the configured BWPs\n");
       mac_init_cell(scc_c, &config, &RC.nrmac[0]->cells[c]);
     }
-    const paramdef_t *cell_params = CellParamList.paramarray[0];
-    const int cell_np = sizeofArray(CellParams);
-    nr_cell_sched_t *cell = &RC.nrmac[0]->cells[0];
-    NR_ServingCellConfigCommon_t *scc = cell->common_channels.ServingCellConfigCommon;
-
     for (j = 0; j < RC.nb_nr_macrlc_inst; j++) {
       gNB_MAC_INST *nrmac = RC.nrmac[j];
       const paramdef_t *params = MacRLC_ParamList.paramarray[j]; // RC.nb_nr_macrlc_inst == 1 as per assert, but keep consistent
@@ -1747,116 +1742,121 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
       } else { // other midhaul
         AssertFatal(1 == 0, "MACRLC %d: %s unknown southbound midhaul\n", j, *gpd(params, np, MACRLC_TRANSPORT_S_PREFERENCE)->strptr);
       }
-      cell->ulsch_max_frame_inactivity = *gpd(cell_params, cell_np, MACRLC_ULSCH_MAX_FRAME_INACTIVITY)->uptr;
       nrmac->stats_max_ue = *gpd(params, np, MACRLC_STATS_MAX_UE)->iptr;
       nrmac->print_ue_stats = nrmac->stats_max_ue > 0;
-      NR_bler_options_t *dl_bler_options = &cell->dl_bler;
-      dl_bler_options->upper = *gpd(cell_params, cell_np, MACRLC_DL_BLER_TARGET_UPPER)->dblptr;
-      dl_bler_options->lower = *gpd(cell_params, cell_np, MACRLC_DL_BLER_TARGET_LOWER)->dblptr;
-      dl_bler_options->min_mcs = *gpd(cell_params, cell_np, MACRLC_DL_MIN_MCS)->u8ptr;
-      dl_bler_options->max_mcs = *gpd(cell_params, cell_np, MACRLC_DL_MAX_MCS)->u8ptr;
-      if (config.disable_harq)
-        dl_bler_options->harq_round_max = 1;
-      else
-        dl_bler_options->harq_round_max = *gpd(cell_params, cell_np, MACRLC_DL_HARQ_ROUND_MAX)->u8ptr;
-      NR_bler_options_t *ul_bler_options = &cell->ul_bler;
-      ul_bler_options->upper = *gpd(cell_params, cell_np, MACRLC_UL_BLER_TARGET_UPPER)->dblptr;
-      ul_bler_options->lower = *gpd(cell_params, cell_np, MACRLC_UL_BLER_TARGET_LOWER)->dblptr;
-      ul_bler_options->min_mcs = *gpd(cell_params, cell_np, MACRLC_UL_MIN_MCS)->u8ptr;
-      ul_bler_options->max_mcs = *gpd(cell_params, cell_np, MACRLC_UL_MAX_MCS)->u8ptr;
-      if (config.disable_harq)
-        ul_bler_options->harq_round_max = 1;
-      else
-        ul_bler_options->harq_round_max = *gpd(cell_params, cell_np, MACRLC_UL_HARQ_ROUND_MAX)->u8ptr;
-      cell->min_grant_prb = *gpd(cell_params, cell_np, MACRLC_MIN_GRANT_PRB)->u16ptr;
-      long sc_fdma = NR_PUSCH_Config__transformPrecoder_enabled;
-      NR_BWP_UplinkCommon_t *bwp = cell->common_channels.ServingCellConfigCommon->uplinkConfigCommon->initialUplinkBWP;
-      if (bwp->rach_ConfigCommon->choice.setup->msg3_transformPrecoder != NULL)
-        sc_fdma = *bwp->rach_ConfigCommon->choice.setup->msg3_transformPrecoder;
-      int new_min = check_sc_fdma_rbsize(sc_fdma, cell->min_grant_prb);
-      // NR_PUSCH_Config__transformPrecoder_enabled	= 0 |	NR_PUSCH_Config__transformPrecoder_disabled	= 1, so !uses_sc_fdma should
-      // be used
-      if (sc_fdma == NR_PUSCH_Config__transformPrecoder_enabled && cell->min_grant_prb != new_min) {
-        LOG_W(NR_MAC,
-              "min_rb value is set as %d. In SC-FDMA, it should be under format 2^x*3^y*5^z and has been automatically decreased "
-              "to %d.\n",
-              cell->min_grant_prb,
-              new_min);
-       cell->min_grant_prb = new_min;
-      }
-      cell->identity_pm = *gpd(cell_params, cell_np, MACRLC_IDENTITY_PM)->u8ptr;
-      // PRB Blacklist
-      uint16_t prbbl[MAX_BWP_SIZE] = {0};
-      int num_ulprbbl = get_prb_blacklist(prbbl);
-      if (num_ulprbbl != -1) {
-        LOG_I(NR_PHY, "Copying %d blacklisted PRB to L1 context\n", num_ulprbbl);
-        memcpy(cell->ulprbbl, prbbl, MAX_BWP_SIZE * sizeof(prbbl[0]));
-      }
-      // config_get_processedint() takes only paramdef_t *, so cast const away
-      paramdef_t *p_ab = (paramdef_t *)gpd(cell_params, cell_np, MACRLC_ANALOG_BEAMFORMING);
-      NR_beam_info_t *beam_info = &cell->beam_info;
-      beam_info->beam_mode = config_get_processedint(cfg, p_ab);
-      beam_info->beams_per_period = beams_per_period;
-      if (cell->beam_info.beam_mode != NO_BEAM_MODE) {
-        if (cell->beam_info.beam_mode == PRECONFIGURED_BEAM_IDX)
-          AssertFatal(NFAPI_MODE == NFAPI_MONOLITHIC, "Analog beamforming only supported for monolithic scenario\n");
-        beam_info->beam_allocation = malloc16(beams_per_period * sizeof(beam_info->beam_allocation));
-        beam_info->beam_duration = *gpd(cell_params, cell_np, MACRLC_BEAM_DURATION)->u8ptr;
-        beam_info->beam_allocation_size = -1; // to be initialized once we have information on frame configuration
-      }
       bool das_enabled = false;
       if (NFAPI_MODE == NFAPI_MONOLITHIC) {
         GET_PARAMS_LIST(L1_ParamList, L1_Params, L1PARAMS_DESC, CONFIG_STRING_L1_LIST, NULL);
         const paramdef_t *l1_params = L1_ParamList.paramarray[j];
         const int l1_np = sizeofArray(L1_Params);
-        das_enabled =  *gpd(l1_params, l1_np, L1_ANALOG_DAS)->uptr;
+        das_enabled = *gpd(l1_params, l1_np, L1_ANALOG_DAS)->uptr;
       }
-      // TODO config_isparamset doesn't seem to work for array types, checking numelt instead
-      int n = gpd(cell_params, cell_np, MACRLC_BEAM_WEIGHTS_LIST)->numelt;
-      if (n > 0) {
-        AssertFatal(!das_enabled, "No need to set beam weights in case of DAS\n");
-        int num_beam = n;
-        if (cell->beam_info.beam_mode == PRECONFIGURED_BEAM_IDX) {
-          AssertFatal(n % num_tx == 0, "Error! Number of beam input needs to be multiple of TX antennas\n");
-          num_beam = n / num_tx;
+
+      const int cell_np = sizeofArray(CellParams);
+      for (int c = 0; c < num_cells; c++) {
+        const paramdef_t *cell_params = CellParamList.paramarray[c];
+        nr_cell_sched_t *cell = &nrmac->cells[c];
+        NR_ServingCellConfigCommon_t *scc = cell->common_channels.ServingCellConfigCommon;
+
+        cell->ulsch_max_frame_inactivity = *gpd(cell_params, cell_np, MACRLC_ULSCH_MAX_FRAME_INACTIVITY)->uptr;
+        NR_bler_options_t *dl_bler_options = &cell->dl_bler;
+        dl_bler_options->upper = *gpd(cell_params, cell_np, MACRLC_DL_BLER_TARGET_UPPER)->dblptr;
+        dl_bler_options->lower = *gpd(cell_params, cell_np, MACRLC_DL_BLER_TARGET_LOWER)->dblptr;
+        dl_bler_options->min_mcs = *gpd(cell_params, cell_np, MACRLC_DL_MIN_MCS)->u8ptr;
+        dl_bler_options->max_mcs = *gpd(cell_params, cell_np, MACRLC_DL_MAX_MCS)->u8ptr;
+        if (cell->radio_config.disable_harq)
+          dl_bler_options->harq_round_max = 1;
+        else
+          dl_bler_options->harq_round_max = *gpd(cell_params, cell_np, MACRLC_DL_HARQ_ROUND_MAX)->u8ptr;
+        NR_bler_options_t *ul_bler_options = &cell->ul_bler;
+        ul_bler_options->upper = *gpd(cell_params, cell_np, MACRLC_UL_BLER_TARGET_UPPER)->dblptr;
+        ul_bler_options->lower = *gpd(cell_params, cell_np, MACRLC_UL_BLER_TARGET_LOWER)->dblptr;
+        ul_bler_options->min_mcs = *gpd(cell_params, cell_np, MACRLC_UL_MIN_MCS)->u8ptr;
+        ul_bler_options->max_mcs = *gpd(cell_params, cell_np, MACRLC_UL_MAX_MCS)->u8ptr;
+        if (cell->radio_config.disable_harq)
+          ul_bler_options->harq_round_max = 1;
+        else
+          ul_bler_options->harq_round_max = *gpd(cell_params, cell_np, MACRLC_UL_HARQ_ROUND_MAX)->u8ptr;
+        cell->min_grant_prb = *gpd(cell_params, cell_np, MACRLC_MIN_GRANT_PRB)->u16ptr;
+        long sc_fdma = NR_PUSCH_Config__transformPrecoder_enabled;
+        NR_BWP_UplinkCommon_t *bwp = cell->common_channels.ServingCellConfigCommon->uplinkConfigCommon->initialUplinkBWP;
+        if (bwp->rach_ConfigCommon->choice.setup->msg3_transformPrecoder != NULL)
+          sc_fdma = *bwp->rach_ConfigCommon->choice.setup->msg3_transformPrecoder;
+        int new_min = check_sc_fdma_rbsize(sc_fdma, cell->min_grant_prb);
+        // NR_PUSCH_Config__transformPrecoder_enabled = 0 | NR_PUSCH_Config__transformPrecoder_disabled = 1
+        if (sc_fdma == NR_PUSCH_Config__transformPrecoder_enabled && cell->min_grant_prb != new_min) {
+          LOG_W(NR_MAC,
+                "min_rb value is set as %d. In SC-FDMA, it should be under format 2^x*3^y*5^z and has been automatically decreased "
+                "to %d.\n",
+                cell->min_grant_prb,
+                new_min);
+          cell->min_grant_prb = new_min;
         }
-        // each beam is described by a set of weights (one for each antenna)
-        // in case of analog beamforming an index to the RU beam identifier is provided
-        // (one for each beam regardless of the number of antennas per beam)
-        config.nb_bfw[0] = num_tx;  // number of tx antennas
-        config.nb_bfw[1] = num_beam; // number of beams weights/indices
-        config.bw_list = calloc_or_fail(n, sizeof(*config.bw_list));
-        for (int b = 0; b < n; b++)
-          config.bw_list[b] = gpd(cell_params, cell_np, MACRLC_BEAM_WEIGHTS_LIST)->iptr[b];
-      } else if (das_enabled) {
-        n = *gpd(cell_params, cell_np, MACRLC_BEAMS_PERIOD)->u8ptr;
-        config.nb_bfw[0] = num_tx;  // number of tx antennas
-        config.nb_bfw[1] = n; // number of beams weights/indices
-        config.bw_list = calloc_or_fail(n, sizeof(*config.bw_list));
-        for (int b = 0; b < n; b++)
-          config.bw_list[b] = b;
-      }
-      config.bt.num_beams = 0;
-      config.bt.num_weights_per_beam = 0;
-      config.bt.beam_ids = NULL;
-      config.bt.beam_weights = NULL;
-      char **fptr = gpd(cell_params, cell_np, MACRLC_DBT_FILE)->strptr;
-      if (fptr && *fptr && **fptr != '\0') {
-        LOG_I(GNB_APP, "loading DBT table from file %s\n", *fptr);
-        config.bt.beam_weights =
-            read_dbt_from_csv(*fptr, &config.bt.num_beams, &config.bt.num_weights_per_beam, &config.bt.beam_ids);
-      } else {
-        char prefix[MAX_OPTNAME_SIZE * 2 + 8];
-        snprintf(prefix, sizeof(prefix), "%s.[0].%s.[0]", GNB_CONFIG_STRING_GNB_LIST, GNB_CONFIG_STRING_CELLS_LIST);
-        config.bt.beam_weights =
-            read_dbt_from_config(prefix, &config.bt.num_beams, &config.bt.num_weights_per_beam, &config.bt.beam_ids);
-      }
-
-      // Read spatial stream indices
-      config_spatial_stream_index(cell_params, cell_np, &cell->radio_config, num_tx);
-
-      // triggers also PHY initialization in case we have L1 via FAPI
-      nr_mac_config_scc(nrmac, cell, scc, &config);
+        cell->identity_pm = *gpd(cell_params, cell_np, MACRLC_IDENTITY_PM)->u8ptr;
+        // PRB Blacklist
+        uint16_t prbbl[MAX_BWP_SIZE] = {0};
+        int num_ulprbbl = get_prb_blacklist(prbbl);
+        if (num_ulprbbl != -1) {
+          LOG_I(NR_PHY, "Copying %d blacklisted PRB to L1 context\n", num_ulprbbl);
+          memcpy(cell->ulprbbl, prbbl, MAX_BWP_SIZE * sizeof(prbbl[0]));
+        }
+        // config_get_processedint() takes only paramdef_t *, so cast const away
+        paramdef_t *p_ab = (paramdef_t *)gpd(cell_params, cell_np, MACRLC_ANALOG_BEAMFORMING);
+        NR_beam_info_t *beam_info = &cell->beam_info;
+        beam_info->beam_mode = config_get_processedint(cfg, p_ab);
+        beam_info->beams_per_period = beams_per_period;
+        if (cell->beam_info.beam_mode != NO_BEAM_MODE) {
+          if (cell->beam_info.beam_mode == PRECONFIGURED_BEAM_IDX)
+            AssertFatal(NFAPI_MODE == NFAPI_MONOLITHIC, "Analog beamforming only supported for monolithic scenario\n");
+          beam_info->beam_allocation = malloc16(beams_per_period * sizeof(beam_info->beam_allocation));
+          beam_info->beam_duration = *gpd(cell_params, cell_np, MACRLC_BEAM_DURATION)->u8ptr;
+          beam_info->beam_allocation_size = -1; // to be initialized once we have information on frame configuration
+        }
+        // TODO config_isparamset doesn't seem to work for array types, checking numelt instead
+        int n = gpd(cell_params, cell_np, MACRLC_BEAM_WEIGHTS_LIST)->numelt;
+        if (n > 0) {
+          AssertFatal(!das_enabled, "No need to set beam weights in case of DAS\n");
+          int num_beam = n;
+          if (cell->beam_info.beam_mode == PRECONFIGURED_BEAM_IDX) {
+            AssertFatal(n % num_tx == 0, "Error! Number of beam input needs to be multiple of TX antennas\n");
+            num_beam = n / num_tx;
+          }
+          // each beam is described by a set of weights (one for each antenna)
+          // in case of analog beamforming an index to the RU beam identifier is provided
+          // (one for each beam regardless of the number of antennas per beam)
+          cell->radio_config.nb_bfw[0] = num_tx;
+          cell->radio_config.nb_bfw[1] = num_beam;
+          cell->radio_config.bw_list = calloc_or_fail(n, sizeof(*cell->radio_config.bw_list));
+          for (int b = 0; b < n; b++)
+            cell->radio_config.bw_list[b] = gpd(cell_params, cell_np, MACRLC_BEAM_WEIGHTS_LIST)->iptr[b];
+        } else if (das_enabled) {
+          n = *gpd(cell_params, cell_np, MACRLC_BEAMS_PERIOD)->u8ptr;
+          cell->radio_config.nb_bfw[0] = num_tx;
+          cell->radio_config.nb_bfw[1] = n;
+          cell->radio_config.bw_list = calloc_or_fail(n, sizeof(*cell->radio_config.bw_list));
+          for (int b = 0; b < n; b++)
+            cell->radio_config.bw_list[b] = b;
+        }
+        cell->radio_config.bt.num_beams = 0;
+        cell->radio_config.bt.num_weights_per_beam = 0;
+        cell->radio_config.bt.beam_ids = NULL;
+        cell->radio_config.bt.beam_weights = NULL;
+        char **fptr = gpd(cell_params, cell_np, MACRLC_DBT_FILE)->strptr;
+        if (fptr && *fptr && **fptr != '\0') {
+          LOG_I(GNB_APP, "loading DBT table from file %s\n", *fptr);
+          cell->radio_config.bt.beam_weights = read_dbt_from_csv(
+              *fptr, &cell->radio_config.bt.num_beams, &cell->radio_config.bt.num_weights_per_beam, &cell->radio_config.bt.beam_ids);
+        } else {
+          char prefix[MAX_OPTNAME_SIZE * 2 + 8];
+          snprintf(prefix, sizeof(prefix), "%s.[0].%s.[%d]", GNB_CONFIG_STRING_GNB_LIST, GNB_CONFIG_STRING_CELLS_LIST, c);
+          cell->radio_config.bt.beam_weights = read_dbt_from_config(
+              prefix, &cell->radio_config.bt.num_beams, &cell->radio_config.bt.num_weights_per_beam, &cell->radio_config.bt.beam_ids);
+        }
+        // Read spatial stream indices
+        config_spatial_stream_index(cell_params, cell_np, &cell->radio_config, num_tx);
+        // triggers also PHY initialization in case we have L1 via FAPI
+        nr_mac_config_scc(nrmac, cell, scc, &cell->radio_config);
+      } // for (int c = 0; c < num_cells; c++)
     } //  for (j=0;j<RC.nb_nr_macrlc_inst;j++)
 
     uint64_t gnb_du_id = 0;

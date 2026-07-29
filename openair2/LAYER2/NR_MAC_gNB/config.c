@@ -403,7 +403,7 @@ int get_ul_slot_offset(const frame_structure_t *fs, int idx, bool count_mixed)
   return ul_slot_idxs[ul_slot_idx_in_period] + period_idx * fs->numb_slots_period;
 }
 
-static void config_common(nr_cell_sched_t *cell, const nr_mac_config_t *config, NR_ServingCellConfigCommon_t *scc)
+static void config_common(nr_cell_sched_t *cell, const nr_mac_config_t *config, NR_ServingCellConfigCommon_t *scc, int cell_idx)
 {
   nfapi_nr_config_request_scf_t *cfg = &cell->config;
   cell->common_channels.ServingCellConfigCommon = scc;
@@ -804,7 +804,8 @@ static void config_common(nr_cell_sched_t *cell, const nr_mac_config_t *config, 
                     cfg->ssb_table.ssb_subcarrier_offset.value;
     if (cfg->carrier_config.dl_frequency.value != cfg->carrier_config.uplink_frequency.value) {
       LOG_I(NR_MAC,
-            "Command line parameters for OAI UE: -C %lu --CO %ld -r %d --numerology %d --band %ld --ssb %d %s\n",
+            "Cell %d command line parameters for OAI UE: -C %lu --CO %ld -r %d --numerology %d --band %ld --ssb %d %s\n",
+            cell_idx,
             carr_dl,
             carr_ul - carr_dl,
             bw,
@@ -814,7 +815,8 @@ static void config_common(nr_cell_sched_t *cell, const nr_mac_config_t *config, 
             get_softmodem_params()->threequarter_fs ? "-E" : "");
     } else {
       LOG_I(NR_MAC,
-            "Command line parameters for OAI UE: -C %lu -r %d --numerology %d --band %ld --ssb %d %s\n",
+            "Cell %d command line parameters for OAI UE: -C %lu -r %d --numerology %d --band %ld --ssb %d %s\n",
+            cell_idx,
             carr_dl,
             bw,
             mu,
@@ -961,11 +963,14 @@ void nr_mac_config_scc(gNB_MAC_INST *nrmac, nr_cell_sched_t *cell, NR_ServingCel
 
   LOG_D(NR_MAC, "Configuring common parameters from NR ServingCellConfig\n");
 
-  config_common(cell, config, scc);
+  const int cell_idx = (int)(cell - nrmac->cells);
+  AssertFatal(cell_idx >= 0 && cell_idx < NR_MAX_CELLS, "cell not in nrmac->cells[]\n");
+  config_common(cell, config, scc, cell_idx);
   fill_beam_index_list(scc, config, cell);
 
-  if (NFAPI_MODE == NFAPI_MONOLITHIC) {
-    // nothing to be sent in the other cases
+  if (NFAPI_MODE == NFAPI_MONOLITHIC && cell == &nrmac->cells[0]) {
+    // In monolithic mode there is one L1 instance shared across all cells;
+    // only configure it for the primary cell to avoid overwriting its config.
     NR_PHY_Config_t phycfg = {.Mod_id = nrmac->Mod_id, .cfg = &cell->config};
     DevAssert(nrmac->if_inst->NR_PHY_config_req);
     nrmac->if_inst->NR_PHY_config_req(&phycfg);
