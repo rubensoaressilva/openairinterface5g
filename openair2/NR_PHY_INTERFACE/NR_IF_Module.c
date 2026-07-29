@@ -19,6 +19,7 @@
 #include "nfapi_interface.h"
 #include "openair2/PHY_INTERFACE/queue_t.h"
 #include "utils.h"
+#include "PHY/defs_gNB.h"
 #include "nfapi/oai_integration/nfapi_pnf.h"
 
 #define MAX_IF_MODULES 100
@@ -47,8 +48,10 @@ static void handle_nr_rach(NR_UL_IND_t *UL_info)
       if (rach->num_preamble > 1) {
         LOG_E(MAC, "Not more than 1 preamble per RACH PDU supported, ignoring the rest\n");
       }
-      nr_initiate_ra_proc(UL_info->module_id,
-                          UL_info->CC_id,
+      gNB_MAC_INST *nr_mac = RC.nrmac[UL_info->module_id];
+      nr_cell_sched_t* cell = &nr_mac->cells[UL_info->CC_id];
+      nr_initiate_ra_proc(nr_mac,
+                          cell,
                           UL_info->rach_ind.sfn,
                           UL_info->rach_ind.slot,
                           rach->preamble_list[0].preamble_index,
@@ -72,6 +75,8 @@ static void handle_nr_uci(NR_UL_IND_t *UL_info)
   }
 
   const module_id_t mod_id = UL_info->module_id;
+  gNB_MAC_INST *nrmac = RC.nrmac[mod_id];
+  nr_cell_sched_t *cell = &nrmac->cells[UL_info->CC_id];
   const frame_t frame = UL_info->uci_ind.sfn;
   const slot_t slot = UL_info->uci_ind.slot;
   int num_ucis = UL_info->uci_ind.num_ucis;
@@ -87,13 +92,13 @@ static void handle_nr_uci(NR_UL_IND_t *UL_info)
         const nfapi_nr_uci_pucch_pdu_format_0_1_t *uci_pdu = &uci_list[i].pucch_pdu_format_0_1;
         LOG_D(NR_MAC, "The received uci has sfn slot %d %d, num_ucis %d and pdu_size %d\n",
                 UL_info->uci_ind.sfn, UL_info->uci_ind.slot, num_ucis, uci_list[i].pdu_size);
-        handle_nr_uci_pucch_0_1(mod_id, frame, slot, uci_pdu);
+        handle_nr_uci_pucch_0_1(nrmac, cell, frame, slot, uci_pdu);
         break;
       }
 
         case NFAPI_NR_UCI_FORMAT_2_3_4_PDU_TYPE: {
           const nfapi_nr_uci_pucch_pdu_format_2_3_4_t *uci_pdu = &uci_list[i].pucch_pdu_format_2_3_4;
-          handle_nr_uci_pucch_2_3_4(mod_id, frame, slot, uci_pdu);
+          handle_nr_uci_pucch_2_3_4(nrmac, cell, frame, slot, uci_pdu);
           break;
         }
       LOG_D(MAC, "UCI handled \n");
@@ -167,8 +172,10 @@ static void handle_nr_ulsch(NR_UL_IND_t *UL_info)
             crc->tb_crc_status);
 
       /* if CRC passes, pass PDU, otherwise pass NULL as error indication */
-      nr_rx_sdu(UL_info->module_id,
-                UL_info->CC_id,
+      gNB_MAC_INST *gNB_mac = RC.nrmac[UL_info->module_id];
+      nr_cell_sched_t *cell = &gNB_mac->cells[UL_info->CC_id];
+      nr_rx_sdu(gNB_mac,
+                cell,
                 UL_info->rx_ind.sfn,
                 UL_info->rx_ind.slot,
                 crc->rnti,
@@ -201,13 +208,16 @@ static void handle_nr_srs(NR_UL_IND_t *UL_info)
   const slot_t slot = UL_info->srs_ind.slot;
   const int num_srs = UL_info->srs_ind.number_of_pdus;
   nfapi_nr_srs_indication_pdu_t *srs_list = UL_info->srs_ind.pdu_list;
-
+  gNB_MAC_INST *nrmac = RC.nrmac[module_id];
+  nr_cell_sched_t *cell = &nrmac->cells[UL_info->CC_id];
   // from here
 
   for (int i = 0; i < num_srs; i++) {
     nfapi_nr_srs_indication_pdu_t *srs_ind = &srs_list[i];
     LOG_D(NR_PHY, "(%d.%d) UL_info->srs_ind.pdu_list[%d].rnti: 0x%04x\n", frame, slot, i, srs_ind->rnti);
-    handle_nr_srs_measurements(module_id,
+
+    handle_nr_srs_measurements(nrmac,
+                               cell,
                                frame,
                                slot,
                                srs_ind);
@@ -367,7 +377,8 @@ static void run_scheduler_monolithic(const nfapi_nr_slot_indication_scf_t *ind, 
   module_id_t module_id = 0;
   int CC_id = 0;
   reset_sched_response(rsp, ind->sfn, ind->slot, module_id, CC_id);
-  gNB_dlsch_ulsch_scheduler(rsp->module_id, ind->sfn, ind->slot, rsp);
+  nr_cell_sched_t *cell = &RC.nrmac[rsp->module_id]->cells[CC_id];
+  gNB_dlsch_ulsch_scheduler(rsp->module_id,cell, ind->sfn, ind->slot, rsp);
 }
 
 static void NR_UL_indication(NR_UL_IND_t *UL_info)

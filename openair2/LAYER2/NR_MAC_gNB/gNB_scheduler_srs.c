@@ -389,11 +389,10 @@ void nr_srs_ri_computation(const nfapi_nr_srs_normalized_channel_iq_matrix_t *nr
   }
 }
 
-static void nr_configure_srs(gNB_MAC_INST *nrmac,
+static void nr_configure_srs(nr_cell_sched_t *cell,
                              nfapi_nr_srs_pdu_t *srs_pdu,
                              int frame,
                              int slot,
-                             int CC_id,
                              NR_UE_info_t *UE,
                              NR_SRS_ResourceSet_t *srs_resource_set,
                              NR_SRS_Resource_t *srs_resource,
@@ -458,21 +457,21 @@ static void nr_configure_srs(gNB_MAC_INST *nrmac,
     srs_pdu->beamforming.num_prgs = m_SRS[srs_pdu->config_index];
     srs_pdu->beamforming.prg_size = srs_pdu->srs_parameters_v4.srs_bandwidth_size;
   }
-  const uint16_t fapi_beam = convert_to_fapi_beam(UE->UE_beam_index, nrmac->beam_info.beam_mode);
-  NR_beam_alloc_t beam = beam_allocation_procedure(&nrmac->beam_info, frame, slot, UE->UE_beam_index, slots_per_frame);
+  const uint16_t fapi_beam = convert_to_fapi_beam(UE->UE_beam_index, cell->beam_info.beam_mode);
+  NR_beam_alloc_t beam = beam_allocation_procedure(&cell->beam_info, frame, slot, UE->UE_beam_index, slots_per_frame);
   AssertFatal(beam.idx >= 0, "Cannot allocate SRS in any available beam\n");
 
   // Indexing SRS antenna ports when beamformed
-  const unsigned int srs_num_rx_ant_ports = nrmac->radio_config.pusch_AntennaPorts;
+  const unsigned int srs_num_rx_ant_ports = cell->radio_config.pusch_AntennaPorts;
   srs_pdu->srs_parameters_v4.num_ul_spatial_streams_ports = srs_num_rx_ant_ports;
   srs_pdu->beamforming.dig_bf_interface = srs_num_rx_ant_ports;
   for (int i = 0; i < srs_num_rx_ant_ports;i++){
     srs_pdu->beamforming.prgs_list[0].dig_bf_interface_list[i].beam_idx = fapi_beam;
     srs_pdu->srs_parameters_v4.Ul_spatial_stream_ports[i] =
-        nrmac->radio_config.spatial_stream_index[beam.idx * srs_num_rx_ant_ports + i];
+        cell->radio_config.spatial_stream_index[beam.idx * srs_num_rx_ant_ports + i];
   }
 
-  uint16_t *vrb_map_UL = &nrmac->common_channels[CC_id].vrb_map_UL[beam.idx][buffer_index * MAX_BWP_SIZE];
+  uint16_t *vrb_map_UL = &cell->common_channels.vrb_map_UL[beam.idx][buffer_index * MAX_BWP_SIZE];
   uint16_t num = 1 << srs_pdu->num_symbols; // 0,1,2 means 1,2,4 symbols, see 222.10.04 table 3-105
   const uint8_t l0 = srs_pdu->time_start_position;
   uint16_t mask = SL_to_bitmap(l0, num);
@@ -480,22 +479,21 @@ static void nr_configure_srs(gNB_MAC_INST *nrmac,
   for (int i = 0; i < srs_pdu->bwp_size; ++i) {
     int rb = i + srs_pdu->bwp_start;
     uint16_t alloc = vrb_map_UL[rb] & mask;
-    AssertFatal(nrmac->ulprbbl[rb] != 0 || alloc == 0, "RB %d not free for SRS: alloc 0x%02x for mask 0x%02x\n", rb, alloc, mask);
+    AssertFatal(cell->ulprbbl[rb] != 0 || alloc == 0, "RB %d not free for SRS: alloc 0x%02x for mask 0x%02x\n", rb, alloc, mask);
     vrb_map_UL[rb] |= mask;
   }
 }
 
-static void nr_fill_nfapi_srs(gNB_MAC_INST *nrmac,
-                              int CC_id,
+static void nr_fill_nfapi_srs(nr_cell_sched_t *cell,
                               NR_UE_info_t *UE,
                               int frame,
                               int slot,
                               NR_SRS_ResourceSet_t *srs_resource_set,
                               NR_SRS_Resource_t *srs_resource)
 {
-  int slots_frame = nrmac->frame_structure.numb_slots_frame;
-  int index = ul_buffer_index(frame, slot, slots_frame, nrmac->UL_tti_req_ahead_size);
-  nfapi_nr_ul_tti_request_t *future_ul_tti_req = &nrmac->UL_tti_req_ahead[0][index];
+  int slots_frame = cell->frame_structure.numb_slots_frame;
+  int index = ul_buffer_index(frame, slot, slots_frame, cell->UL_tti_req_ahead_size);
+  nfapi_nr_ul_tti_request_t *future_ul_tti_req = &cell->UL_tti_req_ahead[index];
   AssertFatal(future_ul_tti_req->n_pdus <
               sizeof(future_ul_tti_req->pdus_list) / sizeof(future_ul_tti_req->pdus_list[0]),
               "Invalid future_ul_tti_req->n_pdus %d\n", future_ul_tti_req->n_pdus);
@@ -504,8 +502,8 @@ static void nr_fill_nfapi_srs(gNB_MAC_INST *nrmac,
   nfapi_nr_srs_pdu_t *srs_pdu = &future_ul_tti_req->pdus_list[future_ul_tti_req->n_pdus].srs_pdu;
   memset(srs_pdu, 0, sizeof(nfapi_nr_srs_pdu_t));
   future_ul_tti_req->n_pdus += 1;
-  index = ul_buffer_index(frame, slot, slots_frame, nrmac->vrb_map_UL_size);
-  nr_configure_srs(nrmac, srs_pdu, frame, slot, CC_id, UE, srs_resource_set, srs_resource, index, slots_frame);
+  index = ul_buffer_index(frame, slot, slots_frame, cell->vrb_map_UL_size);
+  nr_configure_srs(cell, srs_pdu, frame, slot, UE, srs_resource_set, srs_resource, index, slots_frame);
 }
 
 /*******************************************************************
@@ -519,9 +517,8 @@ static void nr_fill_nfapi_srs(gNB_MAC_INST *nrmac,
 * DESCRIPTION :  It schedules SRS in a future slot and calls function to prepare FAPI PDU for L1
 *
 *********************************************************************/
-void nr_schedule_periodic_srs(int module_id, frame_t frame, int slot)
- {
-  gNB_MAC_INST *nrmac = RC.nrmac[module_id];
+void nr_schedule_periodic_srs(gNB_MAC_INST *nrmac, nr_cell_sched_t *cell, frame_t frame, int slot)
+{
 
   /* already mutex protected: held in gNB_dlsch_ulsch_scheduler() */
   NR_SCHED_ENSURE_LOCKED(&nrmac->sched_lock);
@@ -529,7 +526,6 @@ void nr_schedule_periodic_srs(int module_id, frame_t frame, int slot)
   NR_UEs_t *UE_info = &nrmac->UE_info;
 
   UE_iterator(UE_info->connected_ue_list, UE) {
-    const int CC_id = 0;
     NR_UE_UL_BWP_t *current_BWP = &UE->current_UL_BWP;
 
     if (!nr_mac_ue_is_active(UE) && !get_softmodem_params()->phy_test) {
@@ -567,8 +563,8 @@ void nr_schedule_periodic_srs(int module_id, frame_t frame, int slot)
       }
 
       // we are sheduling SRS max_k2 slot in advance for the presence of SRS to be taken into account when scheduling PUSCH
-      const int n_slots_frame = nrmac->frame_structure.numb_slots_frame;
-      const int n_ahead = n_slots_frame - 1 + get_NTN_Koffset(nrmac->common_channels[0].ServingCellConfigCommon);
+      const int n_slots_frame = cell->frame_structure.numb_slots_frame;
+      const int n_ahead = n_slots_frame - 1 + get_NTN_Koffset(cell->common_channels.ServingCellConfigCommon);
       const int sched_slot = (slot + n_ahead) % n_slots_frame;
       const int sched_frame = (frame + (slot + n_ahead) / n_slots_frame) % MAX_FRAME_NUMBER;
 
@@ -579,12 +575,12 @@ void nr_schedule_periodic_srs(int module_id, frame_t frame, int slot)
       if ((sched_frame * n_slots_frame + sched_slot - offset) % period != 0)
         continue;
       LOG_D(NR_MAC," %d.%d Scheduling SRS reception for %d.%d\n", frame, slot, sched_frame, sched_slot);
-      nr_fill_nfapi_srs(nrmac, CC_id, UE, sched_frame, sched_slot, srs_resource_set, srs_resource);
+      nr_fill_nfapi_srs(cell, UE, sched_frame, sched_slot, srs_resource_set, srs_resource);
     }
   }
 }
 
-void nr_schedule_aperiodic_srs(gNB_MAC_INST *nrmac, NR_UE_info_t *UE, int sched_frame, int sched_slot, int k2, int sched_srs)
+void nr_schedule_aperiodic_srs(nr_cell_sched_t *cell, NR_UE_info_t *UE, int sched_frame, int sched_slot, int k2, int sched_srs)
 {
   NR_UE_UL_BWP_t *current_BWP = &UE->current_UL_BWP;
   NR_SRS_Config_t *srs_config = current_BWP->srs_Config;
@@ -615,7 +611,7 @@ void nr_schedule_aperiodic_srs(gNB_MAC_INST *nrmac, NR_UE_info_t *UE, int sched_
              NR_SRS_Resource__resourceType_PR_aperiodic)) {
           NR_SRS_Resource_t *srs_resource = srs_config->srs_ResourceToAddModList->list.array[r2];
           LOG_D(NR_MAC,"Scheduling aperiodic SRS reception for %d.%d\n", sched_frame, sched_slot);
-          nr_fill_nfapi_srs(nrmac, 0, UE, sched_frame, sched_slot, srs_resource_set, srs_resource);
+          nr_fill_nfapi_srs(cell, UE, sched_frame, sched_slot, srs_resource_set, srs_resource);
           nr_timer_start(&UE->UE_sched_ctrl.aperiodic_srs_trigger);  // restart the timer, we are scheduling aperiodic SRS
           return;
         }

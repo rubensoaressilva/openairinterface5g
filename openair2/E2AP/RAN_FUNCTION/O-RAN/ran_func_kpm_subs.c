@@ -3,6 +3,7 @@
  */
 
 #include "ran_func_kpm_subs.h"
+#include "PHY/defs_gNB.h"
 
 #include <search.h>
 
@@ -345,7 +346,7 @@ static meas_record_lst_t fill_CARR_PDSCHMCSDist(const label_info_lst_t label,
     return meas_record;
   }
 
-  const NR_du_stats_t* du_stats = &RC.nrmac[0]->du_stats;
+  const NR_du_stats_t* du_stats = &RC.nrmac[0]->cells[0].du_stats;
   meas_record.value = INTEGER_MEAS_VALUE;
   meas_record.int_val = du_stats->pdsch_mcs_dist[bin_x - 1][bin_y - 1][bin_z];
   return meas_record;
