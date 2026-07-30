@@ -320,6 +320,7 @@ void nr_phy_config_request(NR_PHY_Config_t *phy_config)
   uint8_t short_sequence, num_sequences, rootSequenceIndex, fd_occasion;
   NR_DL_FRAME_PARMS *fp = &RC.gNB[Mod_id]->frame_parms;
   nfapi_nr_config_request_scf_t *gNB_config = &RC.gNB[Mod_id]->gNB_config;
+  fp->cell_idx = phy_config->cell_idx;
 
   copy_config_request(phy_config->cfg, gNB_config);
 

@@ -208,6 +208,7 @@ typedef struct NR_DL_FRAME_PARMS_s {
   uint16_t tdd_slot_config;
   uint8_t tdd_period;
   bool print_ue_help_cmdline_log;
+  int cell_idx;
 } NR_DL_FRAME_PARMS;
 
 // PRS config structures

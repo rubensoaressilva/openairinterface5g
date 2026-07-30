@@ -80,6 +80,7 @@ void reset_sched_response(NR_Sched_Rsp_t *sched_response, int frame, int slot, i
 
 typedef struct {
   uint8_t Mod_id;
+  int cell_idx;
   nfapi_nr_config_request_scf_t *cfg;
 } NR_PHY_Config_t;
 

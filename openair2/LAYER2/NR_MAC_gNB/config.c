@@ -971,7 +971,7 @@ void nr_mac_config_scc(gNB_MAC_INST *nrmac, nr_cell_sched_t *cell, NR_ServingCel
   if (NFAPI_MODE == NFAPI_MONOLITHIC && cell == &nrmac->cells[0]) {
     // In monolithic mode there is one L1 instance shared across all cells;
     // only configure it for the primary cell to avoid overwriting its config.
-    NR_PHY_Config_t phycfg = {.Mod_id = nrmac->Mod_id, .cfg = &cell->config};
+    NR_PHY_Config_t phycfg = {.Mod_id = nrmac->Mod_id, .cell_idx = cell_idx, .cfg = &cell->config};
     DevAssert(nrmac->if_inst->NR_PHY_config_req);
     nrmac->if_inst->NR_PHY_config_req(&phycfg);
   }
