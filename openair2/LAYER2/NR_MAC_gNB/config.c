@@ -968,7 +968,7 @@ void nr_mac_config_scc(gNB_MAC_INST *nrmac, nr_cell_sched_t *cell, NR_ServingCel
   config_common(cell, config, scc, cell_idx);
   fill_beam_index_list(scc, config, cell);
 
-  if (NFAPI_MODE == NFAPI_MONOLITHIC && cell == &nrmac->cells[1]) { // [TEST] use cells[1] or cells[0] to select which cells gets broadcasted
+  if (NFAPI_MODE == NFAPI_MONOLITHIC && cell == &nrmac->cells[0]) { // [TEST] use cells[1] or cells[0] to select which cells gets broadcasted
     // In monolithic mode there is one L1 instance shared across all cells;
     // only configure it for the primary cell to avoid overwriting its config.
     NR_PHY_Config_t phycfg = {.Mod_id = nrmac->Mod_id, .cell_idx = cell_idx, .cfg = &cell->config};

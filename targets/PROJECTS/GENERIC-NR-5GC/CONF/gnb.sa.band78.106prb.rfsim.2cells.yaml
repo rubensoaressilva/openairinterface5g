@@ -9,6 +9,8 @@ Active_gNBs:
 Asn1_verbosity: none
 
 gNBs:
+  # rework this to not use cells[] but to use gNBs, and enforce that gNB_ID and gNB_name remains the same
+  # with the amf ip and everything that's repeated in gNB, enforce that the first has that config, and enforce that the following ones don't have it
   - gNB_ID: 0xe00
     gNB_name: gnb-rfsim
 
@@ -33,6 +35,7 @@ gNBs:
         do_CSIRS: 1
         do_SRS: "none"
         ##### Scheduler parameters:
+        # instead of moving from MACRLCs, just add another entry int he MACRLCs array, and enforce that the count matches the cell count
         pusch_TargetSNRx10: 200
         pucch_TargetSNRx10: 200
         pusch_FailureThres: 1000
