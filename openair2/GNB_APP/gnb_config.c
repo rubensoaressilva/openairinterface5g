@@ -1660,7 +1660,9 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg, nr_cell_sched_t **out_cel
           config.pucch.failure_thres);
 
     ngran_node_t node_type = get_node_type();
-    mac_top_init_gNB(node_type, scc, &config, &default_rlc_config, &cell);
+    mac_top_init_gNB(node_type, &default_rlc_config);
+    cell = &RC.nrmac[0]->cells[0];
+    mac_init_cell(scc, &config, cell);
 
     for (j = 0; j < RC.nb_nr_macrlc_inst; j++) {
       gNB_MAC_INST *nrmac = RC.nrmac[j];
