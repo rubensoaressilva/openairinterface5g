@@ -1807,16 +1807,11 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
       // Read spatial stream indices
       config_spatial_stream_index(params, np, &cell->radio_config, num_tx);
 
-      // nr_mac_config_scc sets up MAC cell state and (when NFAPI_MODE is monolithic
-      // or PNF) also initialises the L1 PHY. In VNF mode (RC.nb_nr_L1_inst == 0)
-      // there is no local L1 but the MAC state still needs initialising; the L1
-      // calls are skipped internally by config_common's NFAPI_MODE check.
-      // In monolithic/DU mode, only call for cells that have a corresponding L1
-      // instance; extra cells don't have PHY contexts to configure.
-      if (RC.nb_nr_L1_inst == 0 || j < RC.nb_nr_L1_inst)
-        nr_mac_config_scc(nrmac, cell, scc, &config);
-      else
-        LOG_W(NR_MAC, "Cell %d: no L1 instance available, skipping PHY configuration\n", j);
+      // nr_mac_config_scc initialises all MAC cell state and (in monolithic mode)
+      // the L1 PHY. The L1 config (NR_PHY_config_req) is guarded to cells[0]
+      // inside config_common, so calling this for secondary cells is safe even
+      // when there is only one L1 instance.
+      nr_mac_config_scc(nrmac, cell, scc, &config);
     } // for (j = 0; j < num_cells; j++)
 
     nrmac->positioning_config = RCconfig_nr_positioning();
@@ -1834,13 +1829,6 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
       cell->nr_cellid = cell_info[j].nr_cellid;
       cell->plmn = cell_info[j].plmn;
 
-      // In multi-cell DU mode (RC.nb_nr_L1_inst > 0) cells beyond the available
-      // L1 instances lack nr_mac_config_scc initialisation, so SIB encoding would
-      // fail. In VNF mode (RC.nb_nr_L1_inst == 0) there is no local L1 at all but
-      // the VNF still owns RRC/MAC and must generate SIBs for every cell.
-      if (RC.nb_nr_L1_inst > 0 && j >= RC.nb_nr_L1_inst)
-        continue;
-
       NR_COMMON_channels_t *cc = &cell->common_channels;
       cc->du_SIBs = fill_du_sibs(GNBParamList.paramarray[j]);
 
@@ -1850,28 +1838,21 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
 
     // read F1 Setup information from config and generated MIB/SIB1
     // and store it at MAC for sending later.
-    // Only include cells that went through SIB1 configuration: in DU/monolithic
-    // mode that is cells 0..nb_nr_L1_inst-1; in VNF mode (nb_nr_L1_inst == 0)
-    // all cells are included.
+    // All cells are included: nr_mac_config_scc runs for every cell,
+    // so SIB1 is configured for all of them regardless of mode.
     {
       const NR_ServingCellConfigCommon_t *scc_arr[NR_MAX_CELLS] = {NULL};
       NR_BCCH_BCH_Message_t *mib_arr[NR_MAX_CELLS] = {NULL};
       const NR_BCCH_DL_SCH_Message_t *sib1_arr[NR_MAX_CELLS] = {NULL};
       seq_arr_t *du_SIBs_arr[NR_MAX_CELLS] = {NULL};
-      f1ap_served_cell_info_t f1_cell_info[NR_MAX_CELLS];
-      int n_f1_cells = 0;
       for (int j = 0; j < num_cells; j++) {
-        if (RC.nb_nr_L1_inst > 0 && j >= RC.nb_nr_L1_inst)
-          continue;
         NR_COMMON_channels_t *cc = &nrmac->cells[j].common_channels;
-        scc_arr[n_f1_cells] = cc->ServingCellConfigCommon;
-        mib_arr[n_f1_cells] = cc->mib;
-        sib1_arr[n_f1_cells] = cc->sib1;
-        du_SIBs_arr[n_f1_cells] = cc->du_SIBs;
-        f1_cell_info[n_f1_cells] = cell_info[j];
-        n_f1_cells++;
+        scc_arr[j] = cc->ServingCellConfigCommon;
+        mib_arr[j] = cc->mib;
+        sib1_arr[j] = cc->sib1;
+        du_SIBs_arr[j] = cc->du_SIBs;
       }
-      f1ap_setup_req_t *req = RC_read_F1Setup(gnb_du_id, name, f1_cell_info, n_f1_cells,
+      f1ap_setup_req_t *req = RC_read_F1Setup(gnb_du_id, name, cell_info, num_cells,
                                                scc_arr, mib_arr, sib1_arr, du_SIBs_arr);
       AssertFatal(req != NULL, "could not read F1 Setup information\n");
       for (int c = 0; c < req->num_cells_available; c++)
