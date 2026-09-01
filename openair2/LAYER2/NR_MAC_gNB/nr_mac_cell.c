@@ -26,6 +26,10 @@ nr_cell_sched_t *nr_mac_get_cell_by_cgi(gNB_MAC_INST *mac, plmn_id_t plmn, uint6
 nr_cell_sched_t *nr_mac_cell_alloc(gNB_MAC_INST *mac)
 {
   nr_cell_sched_t new_cell = {0};
+  nr_mac_pcch_queue_init(&new_cell.common_channels);
+  for (int n = 0; n < MAX_NUM_OF_SSB; n++)
+    new_cell.sib1_pdsch[n].time_domain_allocation = -1;
+  new_cell.first_MIB = true;
   seq_arr_push_back(&mac->cells, &new_cell, sizeof(new_cell));
   return seq_arr_at(&mac->cells, seq_arr_size(&mac->cells) - 1);
 }
