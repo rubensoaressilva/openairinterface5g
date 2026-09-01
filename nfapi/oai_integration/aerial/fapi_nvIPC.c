@@ -143,25 +143,29 @@ static int ipc_handle_rx_msg(nv_ipc_msg_t *msg)
           NFAPI_TRACE(NFAPI_TRACE_ERROR, "%s: Failed to unpack message\n", __FUNCTION__);
         } else {
           NFAPI_TRACE(NFAPI_TRACE_DEBUG, "%s: Handling NR SLOT Indication\n", __FUNCTION__);
-          ind.header.phy_id = phy_id;
-          // check if the sfn/slot unpacked come wrong at any time, should be old + 1 (slot 0 -- 19, sfn 0 -- 1023)
-          uint16_t old_slot_plus = ((old_slot[phy_id] + 1) % 20);
-          uint16_t old_sfn_plus = old_slot_plus == 0 ? ((old_sfn[phy_id] + 1) % 1024) : old_sfn[phy_id];
-          if (old_slot_plus != ind.slot || old_sfn_plus != ind.sfn) {
-            LOG_E(NFAPI_VNF,
-                  "\n============================================================================\n"
-                  "sfn slot doesn't match unpacked one! PHY %d L2->L1 %d.%d  vs L1->L2 %d.%d  \n"
-                  "============================================================================\n",
-                  phy_id,
-                  old_sfn[phy_id],
-                  old_slot[phy_id],
-                  ind.sfn,
-                  ind.slot);
-          }
-          old_sfn[phy_id] = ind.sfn;
-          old_slot[phy_id] = ind.slot;
-          if (vnf_p7_config->_public.nr_slot_indication) {
-            (vnf_p7_config->_public.nr_slot_indication)(&ind);
+          /// HACK: Simulate slot.indication for second cell
+          /// Aerial doesn't seem to send a second SLOT.indication for the second cell for some reason
+          for (int i = 0; i < aerial_params.num_phys; ++i) {
+            ind.header.phy_id = i;
+            // check if the sfn/slot unpacked come wrong at any time, should be old + 1 (slot 0 -- 19, sfn 0 -- 1023)
+            uint16_t old_slot_plus = ((old_slot[i] + 1) % 20);
+            uint16_t old_sfn_plus = old_slot_plus == 0 ? ((old_sfn[i] + 1) % 1024) : old_sfn[i];
+            if (old_slot_plus != ind.slot || old_sfn_plus != ind.sfn) {
+              LOG_E(NFAPI_VNF,
+                    "\n============================================================================\n"
+                    "sfn slot doesn't match unpacked one! PHY %d L2->L1 %d.%d  vs L1->L2 %d.%d  \n"
+                    "============================================================================\n",
+                    i,
+                    old_sfn[i],
+                    old_slot[i],
+                    ind.sfn,
+                    ind.slot);
+            }
+            old_sfn[i] = ind.sfn;
+            old_slot[i] = ind.slot;
+            if (vnf_p7_config->_public.nr_slot_indication) {
+              (vnf_p7_config->_public.nr_slot_indication)(&ind);
+            }
           }
         }
         break;
