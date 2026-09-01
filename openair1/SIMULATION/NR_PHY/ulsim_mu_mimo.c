@@ -632,7 +632,7 @@ int main(int argc, char *argv[])
 
   RC.nb_nr_macrlc_inst = 1;
   mac_top_init_gNB(ngran_gNB, &rlc_config);
-  nr_cell_sched_t *cell = &RC.nrmac[0]->cells[0];
+  nr_cell_sched_t *cell = nr_mac_cell_alloc(RC.nrmac[0]);
   mac_init_cell(scc, &conf, cell);
   cell->beam_info = (NR_beam_info_t){.beams_per_period = 1};
   nr_mac_config_scc(RC.nrmac[0], cell, scc, &conf);
