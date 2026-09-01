@@ -59,7 +59,7 @@ void *nrmac_stats_thread(void *arg) {
     NR_SCHED_LOCK(&gNB->sched_lock);
     for (size_t i = 0; i < seq_arr_size(&gNB->cells); i++) {
       nr_cell_sched_t *cell = seq_arr_at(&gNB->cells, i);
-      p += snprintf(p, end - p, "=== Cell %d ===\n", i);
+      p += snprintf(p, end - p, "=== Cell %zu ===\n", i);
       p += dump_mac_stats(gNB, cell, p, end - p, false);
       p += snprintf(p, end - p, "\n");
       p += print_meas_log(&cell->gNB_scheduler, "gNB_scheduler", NULL, NULL, p, end - p);
