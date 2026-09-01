@@ -57,10 +57,8 @@ void *nrmac_stats_thread(void *arg) {
   while (oai_exit == 0) {
     char *p = output;
     NR_SCHED_LOCK(&gNB->sched_lock);
-    for (int i = 0; i < NR_MAX_CELLS; i++) {
-      nr_cell_sched_t *cell = &gNB->cells[i];
-      if (!cell->common_channels.ServingCellConfigCommon)
-        continue;
+    for (size_t i = 0; i < seq_arr_size(&gNB->cells); i++) {
+      nr_cell_sched_t *cell = seq_arr_at(&gNB->cells, i);
       p += snprintf(p, end - p, "=== Cell %d ===\n", i);
       p += dump_mac_stats(gNB, cell, p, end - p, false);
       p += snprintf(p, end - p, "\n");
@@ -75,7 +73,7 @@ void *nrmac_stats_thread(void *arg) {
     }
     NR_SCHED_UNLOCK(&gNB->sched_lock);
     size_t len = p - output;
-    if (fwrite(output, len, 1, file) != 1 || fflush(file) != 0) {
+    if (len > 0 && (fwrite(output, len, 1, file) != 1 || fflush(file) != 0)) {
       LOG_E(NR_MAC, "error while writing nrMAC_stats.log: %d, %s\n", errno, strerror(errno));
       break;
     }
@@ -283,6 +281,7 @@ void mac_top_init_gNB(ngran_node_t node_type,
     LOG_D(MAC,"[MAIN] ALLOCATE %zu Bytes for gNB_MAC_INST @ %p\n",sizeof(gNB_MAC_INST), RC.mac);
 
     bzero(RC.nrmac[0], sizeof(gNB_MAC_INST));
+    seq_arr_init(&RC.nrmac[0]->cells, sizeof(nr_cell_sched_t));
 
     RC.nrmac[0]->Mod_id = 0;
 
@@ -340,16 +339,15 @@ void mac_top_init_gNB(ngran_node_t node_type,
 
 void mac_top_destroy_gNB(gNB_MAC_INST *mac)
 {
-  for (size_t i = 0; i < sizeofArray(mac->cells); i++) {
-    nr_cell_sched_t *cell = &mac->cells[i];
-    if (cell->common_channels.ServingCellConfigCommon == NULL)
-      continue;
+  for (size_t i = 0; i < seq_arr_size(&mac->cells); i++) {
+    nr_cell_sched_t *cell = seq_arr_at(&mac->cells, i);
     NR_COMMON_channels_t *cc = &cell->common_channels;
     nr_mac_pcch_queue_free(cc);
     ASN_STRUCT_FREE(asn_DEF_NR_BCCH_BCH_Message, cc->mib);
     ASN_STRUCT_FREE(asn_DEF_NR_BCCH_DL_SCH_Message, cc->sib1);
     ASN_STRUCT_FREE(asn_DEF_NR_ServingCellConfigCommon, cc->ServingCellConfigCommon);
   }
+  seq_arr_free(&mac->cells, NULL);
   NR_UEs_t *UE_info = &mac->UE_info;
   for (int i = 0; i < sizeofArray(UE_info->connected_ue_list); ++i)
     if (UE_info->connected_ue_list[i])

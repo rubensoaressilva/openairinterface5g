@@ -113,7 +113,7 @@ static meas_record_lst_t fill_L1M_SS_RSRP(const label_info_lst_t label,
   }
   const uint32_t bin = *label.distBinX;
 
-  const NR_du_stats_t *du_stats = &RC.nrmac[0]->cells[0].du_stats;
+  const NR_du_stats_t *du_stats = &((nr_cell_sched_t *)seq_arr_front(&RC.nrmac[0]->cells))->du_stats;
 
   uint64_t count = 0;
   if (label.ssbIndex != NULL) {
@@ -346,7 +346,7 @@ static meas_record_lst_t fill_CARR_PDSCHMCSDist(const label_info_lst_t label,
     return meas_record;
   }
 
-  const NR_du_stats_t* du_stats = &RC.nrmac[0]->cells[0].du_stats;
+  const NR_du_stats_t* du_stats = &((nr_cell_sched_t *)seq_arr_front(&RC.nrmac[0]->cells))->du_stats;
   meas_record.value = INTEGER_MEAS_VALUE;
   meas_record.int_val = du_stats->pdsch_mcs_dist[bin_x - 1][bin_y - 1][bin_z];
   return meas_record;
@@ -379,7 +379,7 @@ static meas_record_lst_t fill_CARR_PUSCHMCSDist(const label_info_lst_t label,
     return meas_record;
   }
 
-  const NR_du_stats_t* du_stats = &RC.nrmac[0]->cells[0].du_stats;
+  const NR_du_stats_t* du_stats = &((nr_cell_sched_t *)seq_arr_front(&RC.nrmac[0]->cells))->du_stats;
   meas_record.value = INTEGER_MEAS_VALUE;
   meas_record.int_val = du_stats->pusch_mcs_dist[bin_x - 1][bin_y][bin_z];
   return meas_record;

@@ -802,7 +802,7 @@ static void config_common(gNB_MAC_INST *nrmac, nr_cell_sched_t *cell, const nr_m
     int sc_offset = (frequency_range == FR1) ?
                     cfg->ssb_table.ssb_subcarrier_offset.value >> scs :
                     cfg->ssb_table.ssb_subcarrier_offset.value;
-    int cell_idx = (int)(cell - &nrmac->cells[0]);
+    int cell_idx = (int)(cell - (nr_cell_sched_t *)seq_arr_front(&nrmac->cells));
     if (cfg->carrier_config.dl_frequency.value != cfg->carrier_config.uplink_frequency.value) {
       LOG_I(NR_MAC,
             "Cell %d command line parameters for OAI UE: -C %lu --CO %ld -r %d --numerology %d --band %ld --ssb %d %s\n",
@@ -967,8 +967,8 @@ void nr_mac_config_scc(gNB_MAC_INST *nrmac, nr_cell_sched_t *cell, NR_ServingCel
   config_common(nrmac, cell, config, scc);
   fill_beam_index_list(scc, config, cell);
 
-  const int cell_idx = cell - nrmac->cells;
-  if (NFAPI_MODE == NFAPI_MONOLITHIC && cell == &nrmac->cells[1]) { // [TEST] swap to cells[0] to restore
+  const int cell_idx = cell - (nr_cell_sched_t *)seq_arr_front(&nrmac->cells);
+  if (NFAPI_MODE == NFAPI_MONOLITHIC && cell == seq_arr_at(&nrmac->cells, 1)) { // [TEST] swap to cells[0] to restore
     // In monolithic mode there is one L1 instance shared across all cells;
     // only configure it for the primary cell to avoid overwriting its config.
     NR_PHY_Config_t phycfg = {.phy_id = cell_idx, .cfg = &cell->config};
@@ -1185,8 +1185,8 @@ bool nr_update_sib19(const gnb_sat_position_update_t *sat_position)
 
   NR_SCHED_LOCK(&nrmac->sched_lock);
   bool updated = false;
-  for (int i = 0; i < NR_MAX_CELLS; i++) {
-    nr_cell_sched_t *cell = &nrmac->cells[i];
+  for (size_t i = 0; i < seq_arr_size(&nrmac->cells); i++) {
+    nr_cell_sched_t *cell = seq_arr_at(&nrmac->cells, i);
     NR_ServingCellConfigCommon_t *scc = cell->common_channels.ServingCellConfigCommon;
     if (!scc || !scc->ext2 || !scc->ext2->ntn_Config_r17)
       continue;

@@ -1700,8 +1700,10 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
         LOG_E(GNB_APP, "Cell %d: RU info missing, assuming num_tx = %d\n", j, num_tx);
       }
 
-      // Init cell in MAC
-      nr_cell_sched_t *cell = &nrmac->cells[j];
+      // Init cell in MAC: push a new slot then get a pointer to it
+      nr_cell_sched_t new_cell = {0};
+      seq_arr_push_back(&nrmac->cells, &new_cell, sizeof(new_cell));
+      nr_cell_sched_t *cell = seq_arr_at(&nrmac->cells, j);
       mac_init_cell(scc, &config, cell);
       // Per-cell scheduler params applied to cell struct
       cell->ulsch_max_frame_inactivity = *gpd(params, np, MACRLC_ULSCH_MAX_FRAME_INACTIVITY)->uptr;
@@ -1825,7 +1827,7 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
     AssertFatal(n_cells == num_cells, "read_du_cell_info returned %d cells but expected %d\n", n_cells, num_cells);
 
     for (int j = 0; j < num_cells; j++) {
-      nr_cell_sched_t *cell = &nrmac->cells[j];
+      nr_cell_sched_t *cell = seq_arr_at(&nrmac->cells, j);
       cell->nr_cellid = cell_info[j].nr_cellid;
       cell->plmn = cell_info[j].plmn;
 
@@ -1846,7 +1848,7 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
       const NR_BCCH_DL_SCH_Message_t *sib1_arr[NR_MAX_CELLS] = {NULL};
       seq_arr_t *du_SIBs_arr[NR_MAX_CELLS] = {NULL};
       for (int j = 0; j < num_cells; j++) {
-        NR_COMMON_channels_t *cc = &nrmac->cells[j].common_channels;
+        NR_COMMON_channels_t *cc = &((nr_cell_sched_t *)seq_arr_at(&nrmac->cells, j))->common_channels;
         scc_arr[j] = cc->ServingCellConfigCommon;
         mib_arr[j] = cc->mib;
         sib1_arr[j] = cc->sib1;
