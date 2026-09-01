@@ -1700,10 +1700,8 @@ void RCconfig_nr_macrlc(configmodule_interface_t *cfg)
         LOG_E(GNB_APP, "Cell %d: RU info missing, assuming num_tx = %d\n", j, num_tx);
       }
 
-      // Init cell in MAC: push a new slot then get a pointer to it
-      nr_cell_sched_t new_cell = {0};
-      seq_arr_push_back(&nrmac->cells, &new_cell, sizeof(new_cell));
-      nr_cell_sched_t *cell = seq_arr_at(&nrmac->cells, j);
+      // Init cell in MAC: allocate a new slot and get a pointer to it
+      nr_cell_sched_t *cell = nr_mac_cell_alloc(nrmac);
       mac_init_cell(scc, &config, cell);
       // Per-cell scheduler params applied to cell struct
       cell->ulsch_max_frame_inactivity = *gpd(params, np, MACRLC_ULSCH_MAX_FRAME_INACTIVITY)->uptr;
